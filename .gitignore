@@ -1,0 +1,31 @@
+# Secrets — never commit real Slack webhook URLs
+.env
+.env.local
+.env.*.local
+
+# SQLite — alert log lives in this DB; rebuilt at runtime
+lag_monitor.db
+lag_monitor.db-shm
+lag_monitor.db-wal
+lag_monitor.db-journal
+e2e_test.db
+e2e_test.db-shm
+e2e_test.db-wal
+e2e_test.db-journal
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env.bak
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local scratchpad (created by Cowork mode during development)
+outputs/
