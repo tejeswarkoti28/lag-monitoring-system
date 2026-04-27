@@ -23,6 +23,7 @@ import sqlite3
 import sys
 import time
 from contextlib import asynccontextmanager
+import urllib.parse
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from typing import Optional
@@ -60,7 +61,12 @@ except ImportError:
 
 THRESHOLD_MESSAGES: int = 4_000_000          # 4M message lag = breach
 POLL_INTERVAL_SECONDS: float = 5.0           # matches the manual sweep cadence
-RE_ALERT_INTERVAL_SECONDS: int = 30 * 60     # (kept for reference; engine uses edge-trigger, no periodic re-alerts)
+REMINDER_INTERVAL_SECONDS: int = 30 * 60     # re-alert every 30 min while unacknowledged
+MAX_REMINDERS: int = 0                       # 0 = no cap; reminders continue every 30m until ack/resolve.
+                                             # Set to a positive int to bring back a hard cap.
+PUBLIC_URL: str = os.environ.get(
+    "LAG_MONITOR_PUBLIC_URL", "http://localhost:8000"
+).rstrip("/")
 HISTORY_RETENTION_MINUTES: int = 60          # how much in-memory history we keep per job
 WARMUP_MINUTES: int = 30                     # pre-seed history so the dashboard isn't empty
 ENVIRONMENTS: list[str] = ["eus", "scus"]
@@ -514,7 +520,9 @@ class DataSource:
 #   2. Per-team breakdown queries (the "turn 'please reduce lag' into an SLA
 #      conversation" capability that the manual workflow can't produce).
 
-SCHEMA = """
+# Initial table schema. Does NOT include indexes that reference columns
+# added by later migrations — those are created AFTER migrations run.
+_TABLE_SCHEMA = """
 CREATE TABLE IF NOT EXISTS alerts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     job_id TEXT NOT NULL,
@@ -524,14 +532,35 @@ CREATE TABLE IF NOT EXISTS alerts (
     team TEXT NOT NULL,
     channel TEXT NOT NULL,
     alert_type TEXT NOT NULL CHECK(alert_type IN ('breach', 'resolved')),
+    reminder_count INTEGER NOT NULL DEFAULT 0,
     lag_value INTEGER NOT NULL,
     threshold INTEGER NOT NULL,
     delivered_to_slack INTEGER NOT NULL DEFAULT 0,
+    ack_token TEXT,
+    acknowledged_at TEXT,
+    acknowledged_by TEXT,
     created_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_alerts_created ON alerts(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_alerts_team ON alerts(team, created_at);
 """
+
+# Idempotent column additions for older databases. Each runs in its own
+# try/except — if the column already exists, sqlite raises OperationalError
+# and we ignore it.
+_MIGRATIONS: list[str] = [
+    "ALTER TABLE alerts ADD COLUMN reminder_count INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE alerts ADD COLUMN ack_token TEXT",
+    "ALTER TABLE alerts ADD COLUMN acknowledged_at TEXT",
+    "ALTER TABLE alerts ADD COLUMN acknowledged_by TEXT",
+    "ALTER TABLE alerts ADD COLUMN eta_minutes INTEGER",
+    "ALTER TABLE alerts ADD COLUMN eta_at TEXT",
+]
+
+# Indexes — created AFTER migrations so they can reference newly-added cols.
+_INDEXES: list[str] = [
+    "CREATE INDEX IF NOT EXISTS idx_alerts_created   ON alerts(created_at DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_alerts_team      ON alerts(team, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_alerts_ack_token ON alerts(ack_token)",
+]
 
 
 class AlertDB:
@@ -547,7 +576,21 @@ class AlertDB:
 
     def _init(self) -> None:
         with self._conn() as conn:
-            conn.executescript(SCHEMA)
+            # 1. Make sure the table itself exists (won't touch it if already
+            #    there — the IF NOT EXISTS guards against that).
+            conn.executescript(_TABLE_SCHEMA)
+            # 2. Bring older databases up to the current column set. Each
+            #    statement is idempotent: if the column already exists,
+            #    sqlite raises OperationalError and we ignore it.
+            for stmt in _MIGRATIONS:
+                try:
+                    conn.execute(stmt)
+                except sqlite3.OperationalError:
+                    pass
+            # 3. Indexes last — must be after migrations so they can reference
+            #    the new columns (ack_token).
+            for stmt in _INDEXES:
+                conn.execute(stmt)
 
     def insert_alert(
         self,
@@ -559,30 +602,79 @@ class AlertDB:
         team: str,
         channel: str,
         alert_type: str,
+        reminder_count: int,
         lag_value: int,
         delivered_to_slack: bool,
+        ack_token: Optional[str],
         created_at: datetime,
     ) -> int:
         with self._conn() as conn:
             cur = conn.execute(
                 """INSERT INTO alerts
                    (job_id, topic, consumer_group, environment, team, channel,
-                    alert_type, lag_value, threshold, delivered_to_slack, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    alert_type, reminder_count, lag_value, threshold,
+                    delivered_to_slack, ack_token, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     job_id, topic, consumer_group, environment, team, channel,
-                    alert_type, int(lag_value), THRESHOLD_MESSAGES,
-                    1 if delivered_to_slack else 0, iso(created_at),
+                    alert_type, int(reminder_count),
+                    int(lag_value), THRESHOLD_MESSAGES,
+                    1 if delivered_to_slack else 0, ack_token, iso(created_at),
                 ),
             )
             return cur.lastrowid
+
+    def find_alert(self, alert_id: int) -> Optional[dict]:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM alerts WHERE id = ?", (alert_id,),
+            ).fetchone()
+            return dict(row) if row else None
+
+    def find_alert_by_token(self, token: str) -> Optional[dict]:
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM alerts WHERE ack_token = ?", (token,),
+            ).fetchone()
+            return dict(row) if row else None
+
+    def mark_acknowledged(
+        self,
+        alert_id: int,
+        *,
+        by: str,
+        at: datetime,
+        eta_minutes: Optional[int] = None,
+    ) -> bool:
+        """Sets acknowledged_{at,by,eta_*} on the row if not already set."""
+        eta_at_iso = None
+        if eta_minutes and eta_minutes > 0:
+            eta_at_iso = iso(at + _td(minutes=int(eta_minutes)))
+        with self._conn() as conn:
+            cur = conn.execute(
+                """UPDATE alerts
+                      SET acknowledged_at = ?,
+                          acknowledged_by = ?,
+                          eta_minutes     = ?,
+                          eta_at          = ?
+                    WHERE id = ?
+                      AND acknowledged_at IS NULL""",
+                (iso(at), by, int(eta_minutes) if eta_minutes else None,
+                 eta_at_iso, alert_id),
+            )
+            return cur.rowcount > 0
 
     def recent_alerts(self, limit: int = 50) -> list[dict]:
         with self._conn() as conn:
             rows = conn.execute(
                 "SELECT * FROM alerts ORDER BY id DESC LIMIT ?", (limit,)
             ).fetchall()
-            return [dict(r) for r in rows]
+            out = []
+            for r in rows:
+                d = dict(r)
+                d["is_acknowledged"] = bool(d.get("acknowledged_at"))
+                out.append(d)
+            return out
 
     def alerts_in_last_hours(self, hours: int) -> list[dict]:
         cutoff = iso(datetime.fromtimestamp(time.time() - hours * 3600, tz=timezone.utc))
@@ -627,29 +719,50 @@ class AlertDB:
 
 @dataclass
 class _BreachState:
-    last_alerted_at: float          # unix ts of most recent alert send
-    first_breached_at: float        # unix ts of when this breach started
+    first_breached_at: float          # unix ts of when this breach started
+    last_alerted_at: float            # unix ts of most recent alert (initial or reminder)
+    alert_count: int = 1              # 1 = initial, 2 = first reminder, ...
+    acknowledged: bool = False
+    acknowledged_at: Optional[float] = None
+    acknowledged_by: Optional[str] = None
+    eta_minutes: Optional[int] = None    # team's committed drain window
+    eta_at: Optional[float] = None       # absolute unix ts at which we re-alert if still in breach
+    last_alert_id: Optional[int] = None  # DB row id of most recent alert
 
 
 @dataclass
 class AlertEvent:
     """An alert decision produced by the engine for a single reading."""
-    type: str                       # "breach" | "resolved"
+    type: str                         # "breach" | "resolved"
     reading: LagReading
     duration_seconds: float = 0.0
+    reminder_count: int = 0           # 0 = initial breach, 1+ = reminder #N
+    eta_missed: bool = False          # True when this reminder fires because the team's ETA expired
+    prev_eta_minutes: Optional[int] = None   # the ETA value the team had committed to (for messaging)
 
 
 class AlertEngine:
     """
-    Strict edge-trigger semantics:
+    Edge-trigger + reminder semantics:
 
-      * lag goes from below -> at/above threshold:   fire ONE 'breach' alert
-      * lag stays at/above threshold:                 emit nothing (silent)
-      * lag goes from at/above -> below threshold:   fire ONE 'resolved' alert
-      * lag re-crosses upward later:                  fire a NEW 'breach' alert
+      * below -> at/above threshold:        fire INITIAL breach alert
+      * sustained breach, ACK'd:            silent until lag drains
+      * sustained breach, NOT ack'd, AND
+        >= REMINDER_INTERVAL since last:    fire 'breach' as REMINDER #N
+      * at/above -> below:                  fire 'resolved' alert, clear state
+      * re-cross upward later:              brand-new incident, starts unacked
 
-    This avoids spamming a team while they are working an incident — they
-    get exactly one ping per "incident" plus one 'all clear' when it ends.
+    Cadence: every 30 minutes while the breach is unacknowledged AND the
+    lag is still over threshold, indefinitely (default — see MAX_REMINDERS
+    if you want to cap it). The instant a human clicks the Slack ack link
+    or the dashboard ACK button, this engine goes silent for the rest of
+    the breach, even if it then takes hours to drain.
+
+    Long-running breaches: if the lag genuinely takes 3-4 hours to drain
+    and the team has already acknowledged, NO further pings fire. The
+    'all clear' message comes when the lag finally drops below threshold.
+    If the breach is unacknowledged (no one is on it), pings keep coming
+    every 30 min — that's the whole point of the reminder loop.
     """
 
     def __init__(self) -> None:
@@ -662,22 +775,89 @@ class AlertEngine:
 
         if in_breach:
             if prev is None:
-                # NEW breach — fire once, then stay silent for as long as
-                # the job remains in breach.
+                # NEW breach — fire initial alert (alert_count=1).
                 self._state[reading.job_id] = _BreachState(
-                    last_alerted_at=ts, first_breached_at=ts,
+                    first_breached_at=ts,
+                    last_alerted_at=ts,
+                    alert_count=1,
                 )
                 return AlertEvent(type="breach", reading=reading)
-            # already in breach — explicitly suppress.
-            return None
+
+            # Already in breach. Silence rules (in order):
+            #   1. ack'd AND ETA hasn't expired yet → silent.
+            #   2. ack'd AND ETA expired → reset to unacked + fire reminder
+            #      tagged eta_missed=True so the team knows to re-ack with
+            #      a new ETA.
+            #   3. unacked + MAX_REMINDERS hit (only if cap configured) → silent.
+            #   4. unacked + < REMINDER_INTERVAL since last alert → silent.
+            #   5. otherwise → fire next reminder.
+            if prev.acknowledged:
+                if prev.eta_at is None or ts < prev.eta_at:
+                    return None
+                # ETA passed and lag is still over threshold — re-alert.
+                prev_eta = prev.eta_minutes
+                prev.acknowledged = False
+                prev.acknowledged_at = None
+                prev.acknowledged_by = None
+                prev.eta_minutes = None
+                prev.eta_at = None
+                prev.alert_count += 1
+                prev.last_alerted_at = ts
+                return AlertEvent(
+                    type="breach", reading=reading,
+                    duration_seconds=ts - prev.first_breached_at,
+                    reminder_count=prev.alert_count - 1,
+                    eta_missed=True,
+                    prev_eta_minutes=prev_eta,
+                )
+
+            # Unacknowledged path:
+            if MAX_REMINDERS > 0 and prev.alert_count >= MAX_REMINDERS:
+                return None
+            if (ts - prev.last_alerted_at) < REMINDER_INTERVAL_SECONDS:
+                return None
+            prev.alert_count += 1
+            prev.last_alerted_at = ts
+            return AlertEvent(
+                type="breach", reading=reading,
+                duration_seconds=ts - prev.first_breached_at,
+                reminder_count=prev.alert_count - 1,
+            )
 
         # not in breach
         if prev is not None:
             duration = ts - prev.first_breached_at
             del self._state[reading.job_id]
-            # next upward crossing will re-arm and fire a fresh breach alert.
-            return AlertEvent(type="resolved", reading=reading, duration_seconds=duration)
+            return AlertEvent(
+                type="resolved", reading=reading, duration_seconds=duration,
+            )
         return None
+
+    # -- ACK plumbing ---------------------------------------------------------
+    def acknowledge(
+        self,
+        job_id: str,
+        *,
+        by: str,
+        at: float,
+        eta_minutes: int = 30,
+    ) -> bool:
+        """Acknowledge the in-flight breach for `job_id`.
+
+        `eta_minutes` is the team's committed drain window. The engine stays
+        silent until that window expires. If the lag is still in breach at
+        the ETA, the engine fires a reminder asking the team to re-ack with
+        a new ETA. Idempotent — repeated calls update the ETA.
+        """
+        st = self._state.get(job_id)
+        if st is None:
+            return False
+        st.acknowledged = True
+        st.acknowledged_at = at
+        st.acknowledged_by = by
+        st.eta_minutes = max(1, int(eta_minutes)) if eta_minutes else None
+        st.eta_at = (at + st.eta_minutes * 60) if st.eta_minutes else None
+        return True
 
 
 # =============================================================================
@@ -768,12 +948,12 @@ class SlackNotifier:
     async def close(self) -> None:
         await self._client.aclose()
 
-    async def send(self, event: AlertEvent) -> bool:
+    async def send(self, event: AlertEvent, *, ack_url: Optional[str] = None) -> bool:
         """Returns True if Slack accepted the post; False if not configured / failed."""
         webhook = slack_webhook_for(event.reading.team)
         if not webhook:
             return False
-        payload = self._build_payload(event)
+        payload = self._build_payload(event, ack_url=ack_url)
         try:
             r = await self._client.post(webhook, json=payload)
             return 200 <= r.status_code < 300
@@ -781,31 +961,104 @@ class SlackNotifier:
             print(f"[slack] post failed: {exc}", file=sys.stderr)
             return False
 
+    async def send_ack_confirmation(
+        self,
+        *,
+        team: str,
+        topic: str,
+        environment: str,
+        eta_minutes: int,
+        eta_at_iso: Optional[str],
+        eta_missed_followup: bool = False,
+    ) -> bool:
+        """Post a short confirmation message back to the team's channel
+        when someone clicks Acknowledge and picks an ETA. Keeps the team
+        in Slack — no need to visit any dashboard.
+        """
+        webhook = slack_webhook_for(team)
+        if not webhook:
+            return False
+        eta_local = ist_clock_iso(eta_at_iso) if eta_at_iso else "—"
+        env_up = environment.upper()
+        if eta_missed_followup:
+            text = (
+                f":alarm_clock: *{team}* re-acknowledged `{topic}` ({env_up}). "
+                f"New ETA *{eta_local} IST* ({eta_minutes}m)."
+            )
+        else:
+            text = (
+                f":white_check_mark: *{team}* acknowledged the lag breach on "
+                f"`{topic}` ({env_up}). ETA *{eta_local} IST* ({eta_minutes}m). "
+                f"I'll check back at that time — no further pings until then."
+            )
+        payload = {"text": text, "mrkdwn": True}
+        try:
+            r = await self._client.post(webhook, json=payload)
+            return 200 <= r.status_code < 300
+        except Exception as exc:
+            print(f"[slack] ack-confirmation post failed: {exc}", file=sys.stderr)
+            return False
+
     @staticmethod
-    def _build_payload(event: AlertEvent) -> dict:
+    def _build_payload(event: AlertEvent, *, ack_url: Optional[str] = None) -> dict:
         r = event.reading
         is_breach = event.type == "breach"
+        is_reminder = is_breach and event.reminder_count > 0
         color = "#f85149" if is_breach else "#3fb950"
         oncall = slack_oncall_tag(r.team)
         env_up = r.environment.upper()
         over_pct = int(round(
             (r.lag - THRESHOLD_MESSAGES) / THRESHOLD_MESSAGES * 100
         ))
-
-        # Top-level text — visible everywhere (notifications, channel
-        # preview, mobile). Drafted to read like a teammate posted it:
-        # leads with the on-call tag, then a short hand-written paragraph
-        # explaining the situation and asking for help.
         ist_now = ist_clock(r.timestamp)
-        if is_breach:
-            # Short, drafted message — no long explanation, just enough for
-            # the team to know what + where + how-bad.
+
+        # NOTE: the literal ack/dashboard links are no longer concatenated
+        # into the heading text — Slack renders the `actions` block below
+        # as real styled buttons, which is more visible than inline links.
+
+        # Format an "incident duration" string (used for reminders)
+        def _dur_label(secs: float) -> str:
+            mins = int(secs // 60)
+            if mins < 60: return f"{mins}m"
+            hrs, rem = mins // 60, mins % 60
+            return f"{hrs}h{rem:02d}m" if rem else f"{hrs}h"
+
+        if event.eta_missed:
+            # Special reminder: team had committed an ETA and lag is still
+            # above threshold. Ask them to re-ack with a new ETA.
+            eta_committed = event.prev_eta_minutes or 0
+            heading = (
+                f"{oncall} :alarm_clock: *ETA passed* — `{r.topic}` ({env_up}) "
+                f"was acknowledged with a *{eta_committed}-minute* drain "
+                f"window, but lag is *still {_fmt_millions(r.lag)}* "
+                f"({over_pct:+d}% over) at {ist_now} IST. Please re-acknowledge "
+                f"with a new ETA, or the bot will keep nudging."
+            )
+        elif is_reminder:
+            mins = int(event.duration_seconds // 60)
+            dur_label = _dur_label(event.duration_seconds)
+            if mins >= 120:
+                emoji = ":rotating_light:"
+                still = "*STILL UNACKNOWLEDGED*"
+                ask = "Please someone pick this up — one click on the button below silences these reminders."
+            else:
+                emoji = ":warning:"
+                still = "*still unacknowledged*"
+                ask = "Can someone please pick this up? One click on the button below silences these reminders."
+            heading = (
+                f"{oncall} {emoji} *REMINDER #{event.reminder_count}* — "
+                f"`{r.topic}` ({env_up}) lag breach is {still} "
+                f"after {dur_label}. Currently *{_fmt_millions(r.lag)}* "
+                f"({over_pct:+d}% over). {ask}"
+            )
+        elif is_breach:
             heading = (
                 f"{oncall} :rotating_light: hey *{r.team}* — lag breach on "
                 f"`{r.topic}` ({env_up}) at {ist_now} IST: "
                 f"*{_fmt_millions(r.lag)}* ({over_pct:+d}% over the "
                 f"{_fmt_millions(THRESHOLD_MESSAGES)} threshold). "
-                f"Could someone take a look?"
+                f"Click *Acknowledge* below and tell us how long the drain "
+                f"will take."
             )
         else:
             mins = int(event.duration_seconds // 60) if event.duration_seconds else 0
@@ -816,11 +1069,14 @@ class SlackNotifier:
                 f"{ist_now} IST.{window}"
             )
 
-        title = (
-            f":rotating_light: Kafka lag breach — {r.topic}"
-            if is_breach
-            else f":white_check_mark: Recovered — {r.topic}"
-        )
+        if event.eta_missed:
+            title = f":alarm_clock: ETA passed — {r.topic} still in breach"
+        elif is_reminder:
+            title = f":warning: Reminder #{event.reminder_count} — {r.topic} still unacknowledged"
+        elif is_breach:
+            title = f":rotating_light: Kafka lag breach — {r.topic}"
+        else:
+            title = f":white_check_mark: Recovered — {r.topic}"
         fields = [
             {"title": "Topic", "value": r.topic, "short": False},
             {"title": "Consumer Group", "value": r.consumer_group, "short": False},
@@ -837,16 +1093,31 @@ class SlackNotifier:
                 {"title": "Breach duration", "value": f"{mins} min", "short": True}
             )
 
+        attachment: dict = {
+            "color": color,
+            "title": title,
+            "fields": fields,
+            "footer": "Kafka Lag Monitor · 30-min reminders until ack or recovery",
+            "ts": int(r.timestamp.timestamp()),
+        }
+        # Real Slack action buttons (rendered styled, no Slack-app needed).
+        # The "View graph" button deep-links straight to this job's modal
+        # on the dashboard via ?job=<job_id> — operators on call get the
+        # exact graph the team is breaching, no hunting needed.
+        if is_breach and ack_url:
+            graph_url = (
+                f"{PUBLIC_URL}/?job={urllib.parse.quote(r.job_id, safe='')}"
+            )
+            attachment["actions"] = [
+                {"type": "button", "text": "✅ Acknowledge & set ETA",
+                 "url": ack_url, "style": "primary"},
+                {"type": "button", "text": "📈 View graph",
+                 "url": graph_url},
+            ]
         return {
             "text": heading,
             "mrkdwn": True,
-            "attachments": [{
-                "color": color,
-                "title": title,
-                "fields": fields,
-                "footer": "Kafka Lag Monitor · one ping per breach",
-                "ts": int(r.timestamp.timestamp()),
-            }],
+            "attachments": [attachment],
         }
 
 
@@ -941,8 +1212,17 @@ class Monitor:
         ]
 
     async def _handle_event(self, event: AlertEvent) -> None:
-        delivered = await self.notifier.send(event)
-        self.db.insert_alert(
+        # Generate a per-alert ACK token only for breach-type events.
+        # Resolved events have no actionable button.
+        ack_token = None
+        ack_url = None
+        if event.type == "breach":
+            import secrets
+            ack_token = secrets.token_urlsafe(16)
+            ack_url = f"{PUBLIC_URL}/ack/{ack_token}"
+
+        delivered = await self.notifier.send(event, ack_url=ack_url)
+        row_id = self.db.insert_alert(
             job_id=event.reading.job_id,
             topic=event.reading.topic,
             consumer_group=event.reading.consumer_group,
@@ -950,10 +1230,18 @@ class Monitor:
             team=event.reading.team,
             channel=event.reading.channel,
             alert_type=event.type,
+            reminder_count=event.reminder_count,
             lag_value=event.reading.lag,
             delivered_to_slack=delivered,
+            ack_token=ack_token,
             created_at=event.reading.timestamp,
         )
+        # Remember the most recent alert row on the engine state so that the
+        # ACK endpoint can update the right job's in-memory breach state.
+        if event.type == "breach":
+            st = self.engine._state.get(event.reading.job_id)
+            if st is not None:
+                st.last_alert_id = row_id
 
     # ---- lifecycle ----------------------------------------------------------
     def start(self) -> None:
@@ -1157,6 +1445,199 @@ def inject(job_id: str, duration: int = 120):
 def clear(job_id: str):
     cleared = _source.clear_injection(job_id)
     return {"ok": True, "job_id": job_id, "cleared": cleared}
+
+
+# =============================================================================
+# Acknowledgement
+# =============================================================================
+# A breach alert can be acknowledged either by clicking the link in the Slack
+# message (GET /ack/{token}) or via the dashboard's ACK button (POST /api/ack/
+# {alert_id}). Once acknowledged, the engine stops pinging that breach.
+def _do_ack(*, alert_row: dict, by: str, eta_minutes: int = 30) -> dict:
+    """Shared ack logic. Marks DB + engine state. Idempotent."""
+    eta_minutes = max(1, int(eta_minutes)) if eta_minutes else 30
+    if alert_row.get("acknowledged_at"):
+        return {
+            "ok": True, "already": True,
+            "alert_id": alert_row["id"],
+            "job_id": alert_row["job_id"],
+            "acknowledged_at": alert_row["acknowledged_at"],
+            "acknowledged_by": alert_row.get("acknowledged_by"),
+            "eta_minutes": alert_row.get("eta_minutes"),
+            "eta_at":      alert_row.get("eta_at"),
+        }
+    now = now_utc()
+    _db.mark_acknowledged(alert_row["id"], by=by, at=now, eta_minutes=eta_minutes)
+    _engine.acknowledge(alert_row["job_id"], by=by, at=now.timestamp(), eta_minutes=eta_minutes)
+    eta_at = now + _td(minutes=eta_minutes)
+    return {
+        "ok": True, "already": False,
+        "alert_id": alert_row["id"],
+        "job_id": alert_row["job_id"],
+        "acknowledged_at": iso(now),
+        "acknowledged_by": by,
+        "eta_minutes": eta_minutes,
+        "eta_at": iso(eta_at),
+    }
+
+
+@app.post("/api/ack/{alert_id}")
+async def api_ack(alert_id: int, by: str = "dashboard", eta: int = 30):
+    """Acknowledge by alert ID (used by the dashboard's ACK button).
+
+    `eta` is the team's drain window in minutes (default 30). Engine stays
+    silent for that window before pinging again if lag is still over
+    threshold.
+    """
+    row = _db.find_alert(alert_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"unknown alert: {alert_id}")
+    if row["alert_type"] != "breach":
+        raise HTTPException(status_code=400, detail="only breach alerts can be acknowledged")
+    result = _do_ack(alert_row=row, by=by, eta_minutes=eta)
+    if result["ok"] and not result.get("already"):
+        await _notifier.send_ack_confirmation(
+            team=row["team"], topic=row["topic"], environment=row["environment"],
+            eta_minutes=int(result.get("eta_minutes") or eta),
+            eta_at_iso=result.get("eta_at"),
+        )
+    return result
+
+
+@app.get("/ack/{token}")
+async def web_ack(token: str, confirm: int = 0, eta: int = 30):
+    """Acknowledge by ACK token (the link embedded in Slack messages).
+
+    Two-step UX:
+      * confirm=0 (default) → render an HTML form asking the team for an ETA
+      * confirm=1           → form submits back here with eta=N, ack happens
+
+    On a successful first-time ack the bot posts a one-line confirmation
+    back to the team's Slack channel, so the team never has to look anywhere
+    other than Slack.
+    """
+    row = _db.find_alert_by_token(token)
+    if row is None:
+        return _ack_html_page(
+            ok=False, title="Link expired",
+            message="That acknowledge link is invalid or has been rotated.",
+        )
+    if row.get("acknowledged_at"):
+        return _ack_html_page(
+            ok=True, title="Already acknowledged",
+            message="No action needed — your team has already responded.",
+        )
+    if not confirm:
+        return _ack_form_page(token=token, alert_row=row)
+    # confirm=1 → record the ack with the chosen ETA + post confirmation
+    # back to the team channel so the rest of the team sees it.
+    result = _do_ack(alert_row=row, by="slack-link", eta_minutes=eta)
+    if result["ok"] and not result.get("already"):
+        await _notifier.send_ack_confirmation(
+            team=row["team"], topic=row["topic"], environment=row["environment"],
+            eta_minutes=int(result.get("eta_minutes") or eta),
+            eta_at_iso=result.get("eta_at"),
+        )
+    return _ack_html_page(
+        ok=True, title="Acknowledged ✓",
+        message=(
+            "Thanks — your acknowledgement and ETA have been posted to your "
+            "team's Slack channel. You can close this tab."
+        ),
+    )
+
+
+def ist_clock_iso(iso_str: Optional[str]) -> str:
+    """Format an ISO-8601 UTC string as HH:MM in IST. Used in /ack page."""
+    if not iso_str:
+        return "—"
+    try:
+        dt = datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
+        return ist_clock(dt)
+    except (ValueError, TypeError):
+        return "—"
+
+
+def _ack_form_page(*, token: str, alert_row: dict):
+    """Render the ETA picker form shown when the Slack ack link is clicked."""
+    from fastapi.responses import HTMLResponse
+    topic = alert_row["topic"]
+    env_up = alert_row["environment"].upper()
+    team = alert_row["team"]
+    lag_m = alert_row["lag_value"] / 1_000_000
+    body = f"""<!doctype html>
+<html><head><meta charset='utf-8'>
+<title>Acknowledge — {topic}</title>
+<style>
+  body {{ background:#0b0d10; color:#e6edf3; font-family:Manrope,system-ui,sans-serif;
+          display:grid; place-items:center; min-height:100vh; margin:0; padding:24px; }}
+  .card {{ background:#11151a; border:1px solid #232b35; border-radius:10px;
+           padding:28px 32px; max-width:560px; box-shadow:0 0 18px rgba(0,0,0,0.4); }}
+  h1 {{ margin:0 0 6px 0; font-size:18px; color:#f85149; }}
+  p  {{ margin:0 0 14px 0; font-size:13.5px; line-height:1.5; color:#c9d1d9; }}
+  code, b {{ font-family:'JetBrains Mono',monospace; color:#fff; }}
+  .meta {{ color:#8b949e; font-size:12px; padding:8px 0 18px 0;
+           border-bottom:1px solid #232b35; margin-bottom:18px; }}
+  label {{ display:block; font-size:12px; color:#8b949e;
+           margin: 4px 0 6px 0; letter-spacing:0.4px; text-transform:uppercase; }}
+  select {{ width:100%; padding:10px 12px; font-size:14px;
+            background:#0d1117; color:#e6edf3; border:1px solid #2e3742;
+            border-radius:6px; font-family:'JetBrains Mono',monospace; }}
+  button {{ margin-top:18px; padding:11px 18px; font-size:13px;
+            font-family:Manrope,sans-serif; font-weight:700; letter-spacing:0.6px;
+            background:linear-gradient(180deg,#1a3a23,#122d18);
+            color:#3fb950; border:1px solid #2c5d39; border-radius:6px;
+            cursor:pointer; transition: filter 0.1s; }}
+  button:hover {{ filter:brightness(1.15); }}
+  a {{ color:#58a6ff; text-decoration:none; font-size:12px; margin-top:14px; display:inline-block; }}
+</style></head>
+<body><div class='card'>
+  <h1>🚨 Acknowledge breach</h1>
+  <p>You're about to acknowledge a Kafka consumer-lag breach for <b>{team}</b>.</p>
+  <div class='meta'>
+    Topic: <code>{topic}</code><br>
+    Environment: <code>{env_up}</code> &middot; Current lag: <code>{lag_m:.2f}M</code> messages
+  </div>
+  <form method='GET' action='/ack/{token}'>
+    <input type='hidden' name='confirm' value='1' />
+    <label for='eta'>How long until you expect this to drain?</label>
+    <select id='eta' name='eta'>
+      <option value='15'>15 minutes</option>
+      <option value='30' selected>30 minutes</option>
+      <option value='60'>1 hour</option>
+      <option value='120'>2 hours</option>
+      <option value='240'>4 hours</option>
+      <option value='480'>8 hours</option>
+    </select>
+    <button type='submit'>✅ Acknowledge</button>
+  </form>
+</div></body></html>"""
+    return HTMLResponse(content=body, status_code=200)
+
+
+def _ack_html_page(*, ok: bool, title: str, message: str):
+    """Tiny one-card confirmation page returned for /ack/{token}.
+    Deliberately simple — no dashboard link, nothing for the team to click
+    next. Their workflow lives in Slack.
+    """
+    from fastapi.responses import HTMLResponse
+    color = "#3fb950" if ok else "#f85149"
+    body = f"""<!doctype html>
+<html><head><meta charset='utf-8'><title>{title}</title>
+<style>
+  body {{ background:#0b0d10; color:#e6edf3; font-family:Manrope,system-ui,sans-serif;
+          display:grid; place-items:center; min-height:100vh; margin:0; padding:24px; }}
+  .card {{ background:#11151a; border:1px solid #232b35; border-radius:10px;
+           padding:30px 34px; max-width:480px; text-align:center;
+           box-shadow:0 0 18px rgba(0,0,0,0.4); }}
+  h1 {{ margin:0 0 10px 0; font-size:18px; color:{color}; }}
+  p  {{ margin:0; font-size:14px; line-height:1.5; color:#c9d1d9; }}
+</style></head>
+<body><div class='card'>
+  <h1>{'✓ ' if ok else '✕ '}{title}</h1>
+  <p>{message}</p>
+</div></body></html>"""
+    return HTMLResponse(content=body, status_code=200 if ok else 404)
 
 
 # =============================================================================

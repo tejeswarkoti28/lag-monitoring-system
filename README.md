@@ -62,6 +62,93 @@ manager pitch.
 
 ---
 
+## Alerting model — one ping per breach + 30-min reminders until ack
+
+The alert engine is **edge-triggered**: a single alert fires the moment lag
+crosses the 4M threshold, and a single "all clear" fires when it drops back
+below. While the breach is active, the engine sends **reminder pings every
+30 minutes** until either:
+
+1. someone **acknowledges** the alert, or
+2. the lag drains back below the threshold (resolved).
+
+Once acknowledged, the engine goes silent for the rest of that breach —
+even if the lag stays elevated for hours. The team needs ONE response to
+turn off pings, not constant attention.
+
+Long-running breach? No problem. If the lag genuinely takes 3-4 hours to
+drain and the team has acknowledged at minute 15, only **two** Slack
+messages were sent: the initial alert and the eventual "all clear". If
+unacknowledged, reminders keep coming every 30 min indefinitely (cadence
+is `REMINDER_INTERVAL_SECONDS` in `app.py`; capacity is uncapped by default
+via `MAX_REMINDERS = 0`).
+
+### How acknowledgement works
+
+There are **two click paths** to acknowledge — both produce the exact same
+effect on the engine state:
+
+1. **Click the ACK link inside the Slack message.** Every breach alert ends
+   with `· ✅ Acknowledge` — that's a hyperlink to
+   `{LAG_MONITOR_PUBLIC_URL}/ack/{token}`. Clicking opens a small browser
+   confirmation page and stops further reminders for this breach.
+2. **Click the `ACKNOWLEDGE` button in the dashboard's live alert feed.**
+   It POSTs to `/api/ack/{alert_id}` with `by=dashboard`.
+
+Why click links and not Slack reactions or `/ack` slash-commands? Reactions
+and slash-commands require a full **Slack App** with the **Events API**
+(or Slash Commands) configured, plus a publicly-reachable callback URL,
+plus a bot user added to every team channel. The link-based ack is the
+standard "incoming-webhook-only" pattern — works the moment you paste an
+incoming-webhook URL into `.env`, no Slack-app setup needed. PagerDuty's
+basic Slack integration uses the same pattern.
+
+If you later want reaction/reply ack, the upgrade path is:
+
+- Create a Slack App in `api.slack.com/apps` with the `app_mentions:read`,
+  `reactions:read`, and `chat:write` scopes.
+- Wire the Events API at `your-domain/slack/events` and verify it.
+- Replace `SlackNotifier` to post via the bot token, and add an event
+  handler that calls `_engine.acknowledge(...)` when a recognised reaction
+  is added.
+
+This is ~half a day of work. The link approach in the MVP costs zero
+Slack-app setup and is enough to demo + pilot.
+
+### What the team sees in Slack over a long incident
+
+```
+22:30  <!channel> 🚨 hey *Catalog Team* — lag breach on `canada-catalog-sku-events`
+       (SCUS) at 22:30 IST: *6.40M* (+60% over the 4.00M threshold).
+       Could someone take a look? · ✅ Acknowledge · 📈 Open dashboard
+
+23:00  <!channel> ⚠️ *REMINDER #1* — `canada-catalog-sku-events` (SCUS) lag breach
+       is *still unacknowledged* after 30m. Currently *6.40M* (+60% over). Can
+       someone please pick this up? · ✅ Acknowledge · 📈 Open dashboard
+
+23:30  <!channel> ⚠️ *REMINDER #2* — ... still unacknowledged after 1h ...
+00:00  <!channel> ⚠️ *REMINDER #3* — ... still unacknowledged after 1h30m ...
+00:30  <!channel> 🚨 *REMINDER #4* — ... *STILL UNACKNOWLEDGED* after 2h ...
+                  (tone escalates once it crosses 2 hours)
+       (somebody finally clicks ✅ Acknowledge — silence from this point)
+
+03:15  <!channel> ✅ *Catalog Team* — `canada-catalog-sku-events` (SCUS)
+       recovered to *1.80M* at 03:15 IST. Breach lasted ~4h45m.
+```
+
+Total messages over a 4-hour-45-minute incident: **6** (initial + 4
+reminders + recovery). Without the engine, you'd be paging humans every
+poll cycle, every 5 seconds, for 4+ hours — a recipe for alert fatigue.
+
+### Audit data
+
+Every alert (initial + each reminder + each resolved) is persisted to
+SQLite with an `acknowledged_at` and `acknowledged_by` column. That gives
+you the building blocks for **MTTA (mean time to acknowledge)** reporting
+per team and per topic — turn into a dashboard column whenever you're ready.
+
+---
+
 ## Manager demo script — 6-minute pitch
 
 Run the server, open the dashboard, and walk through this in order.
