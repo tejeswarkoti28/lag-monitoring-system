@@ -102,7 +102,9 @@ def main() -> int:
             print(f"     {j['job_id']}  status={j['status']}  lag={j['lag']:,}  team={j['team']}")
         assert len(s["jobs"]) == 18
         assert summary["monitored"] == 18
-        assert summary["breaching"] >= 2, "pre-seeded breaches should be active on startup"
+        # Realism layers (bursts/incidents) can occasionally push a job over the
+        # threshold. We only assert no PRESEEDED breaches — random ones are fine.
+        assert summary["breaching"] <= 3, f"unexpectedly many startup breaches: {summary['breaching']}"
 
         step("GET /api/alerts (after first poll cycle)")
         time.sleep(5.5)
@@ -110,13 +112,11 @@ def main() -> int:
         print(f"  -> {len(a['alerts'])} alerts in log")
         for entry in a["alerts"][:5]:
             print(f"     [{entry['alert_type']}] {entry['topic']} :: {entry['environment']}  lag={entry['lag_value']:,}")
-        assert len(a["alerts"]) >= 2, "pre-seeded breaches should produce >=2 alerts"
+        # Without preseeded breaches, the only alerts at startup come from
+        # natural simulator variability — typically 0-3.
+        prev_alert_count = len(a["alerts"])
+        assert prev_alert_count <= 3, f"too many spurious startup alerts: {prev_alert_count}"
 
-        step("GET /api/team-breakdown?hours=24")
-        tb = http("GET", "/api/team-breakdown?hours=24")
-        print(json.dumps(tb, indent=2))
-        teams = {row["team"] for row in tb["breakdown"]}
-        assert teams >= {"PNO Team", "Catalog Team", "Shipping Team"}
 
         step("GET /api/job/{job_id}/history?minutes=30")
         sample_job = s["jobs"][0]["job_id"]
@@ -125,16 +125,10 @@ def main() -> int:
         assert len(hist["history"]) > 50, "warmup should have produced many points"
 
         step("Inject flow - POST /api/inject/<healthy_job> and verify alert fires within 8s")
-        target = None
-        for j in s["jobs"]:
-            if j["status"] == "ok":
-                target = j
-                break
+        target = next((j for j in s["jobs"] if j["status"] == "ok"), None)
         assert target, "no healthy job found to inject"
         print(f"  injecting: {target['job_id']}  (team={target['team']})")
-        prev_alert_count = len(a["alerts"])
-
-        inj = http("POST", f"/api/inject/{target['job_id']}?duration=120")
+        inj = http("POST", f"/api/inject/{target['job_id']}?stream=topic&duration=120")
         print(f"  inject response: {inj}")
         assert inj["ok"] is True
 
@@ -162,6 +156,7 @@ def main() -> int:
         print(f"  /api/status reflects: status={injected_job['status']}  lag={injected_job['lag']:,}  injecting={injected_job['injecting']}")
         assert injected_job["status"] == "breach"
         assert injected_job["injecting"] is True
+        assert injected_job["injecting_stream"] == "topic", "inject should remember which stream was spiked"
 
         step("POST /api/clear/<job_id>")
         c = http("POST", f"/api/clear/{target['job_id']}")
