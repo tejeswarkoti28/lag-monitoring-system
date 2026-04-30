@@ -630,10 +630,16 @@ class AlertDB:
             )
             return cur.lastrowid
 
-    def recent_alerts(self, limit: int = 50) -> list[dict]:
+    def recent_alerts(self, limit: int = 50, hours: int = 24) -> list[dict]:
+        """Latest alerts from the past `hours` window (default 24h)."""
+        cutoff = iso(
+            datetime.fromtimestamp(time.time() - hours * 3600, tz=timezone.utc)
+        )
         with self._conn() as conn:
             rows = conn.execute(
-                "SELECT * FROM alerts ORDER BY id DESC LIMIT ?", (limit,)
+                "SELECT * FROM alerts WHERE created_at >= ? "
+                "ORDER BY id DESC LIMIT ?",
+                (cutoff, limit),
             ).fetchall()
             return [dict(r) for r in rows]
 

@@ -481,16 +481,6 @@
   }
   .alert { cursor: pointer; transition: border-color 0.1s, transform 0.1s; }
   .alert:hover { border-color: var(--line-2); transform: translateX(-1px); }
-  .synthesized-tag {
-    display: inline-block;
-    background: #1e2730; color: var(--purple);
-    border: 1px solid #3d3155;
-    border-radius: 3px;
-    font: 600 9.5px 'JetBrains Mono', monospace;
-    padding: 1px 6px;
-    margin-left: 6px;
-    letter-spacing: 0.5px;
-  }
 
   /* Spinner */
   .loading { color: var(--text-mute); font-size: 12px; padding: 20px; text-align: center; }
@@ -674,8 +664,9 @@ async function refreshStatus() {
     renderJobs(data.jobs);
     renderInjectSelect(data.jobs);
     if (data.summary.last_poll_at) {
+      // Polled every 5 s; this just confirms the data is fresh.
       document.getElementById('last-poll').textContent =
-        `last poll: ${shortTime(data.summary.last_poll_at)} (${relTime(data.summary.last_poll_at)})`;
+        `Last update: ${relTime(data.summary.last_poll_at)}`;
     }
     updateSlackIndicator(data.summary.slack_configured);
   } catch (e) {
@@ -921,11 +912,17 @@ async function loadGraph(jobId, valueKey, label, minutes, alertTsMs, slot) {
   try {
     const data = await api(`/api/job/${encodeURIComponent(jobId)}/history?minutes=${minutes}`);
     if (meta) {
-      const pts = data.history.length;
-      const synthTag = data.synthesized
-        ? '<span class="synthesized-tag">SYNTHETIC HISTORY</span>'
-        : '';
-      meta.innerHTML = `<span class="mono">${pts} points · step ${_fmtStep(data.step_seconds)}</span>${synthTag}`;
+      // Show the current per-graph lag value next to the graph name so
+      // each stream's number is unmistakable (the in-chart pinned label
+      // is easy to overlook).
+      const last = data.history.length ? data.history[data.history.length - 1] : null;
+      const curVal = last ? (last[valueKey] || 0) : 0;
+      const breach = curVal >= (data.threshold || 4_000_000);
+      const color = breach ? 'var(--red)' : 'var(--text)';
+      meta.innerHTML =
+        `<span class="mono" style="color:${color};font-weight:600;">` +
+        `current ${(curVal / 1_000_000).toFixed(2)}M` +
+        `</span>`;
     }
     drawGraph(svg, data.history, data.threshold, valueKey, label, minutes, alertTsMs);
   } catch (e) {
@@ -933,13 +930,6 @@ async function loadGraph(jobId, valueKey, label, minutes, alertTsMs, slot) {
   }
 }
 
-function _fmtStep(sec) {
-  if (!sec) return '—';
-  if (sec < 60)        return `${sec}s`;
-  if (sec < 3600)      return `${Math.round(sec / 60)}m`;
-  if (sec < 86400)     return `${Math.round(sec / 3600)}h`;
-  return `${Math.round(sec / 86400)}d`;
-}
 
 function _buildRangeBar(slot, activeKey) {
   return `<div class="range-group" data-slot="${slot}" role="tablist">
@@ -971,7 +961,7 @@ function renderModalBody(jobId, activePresetKey) {
       <span>·</span>
       <span>Threshold: <b>${FMT_MS(threshold)}M</b></span>
       <span>·</span>
-      <span>Current lag: <b class="mono" style="color:${breach ? 'var(--breach)' : 'var(--healthy)'}">${FMT_MS(lag)}M</b></span>
+      <span>Current lag (max of both): <b class="mono" style="color:${breach ? 'var(--breach)' : 'var(--healthy)'}">${FMT_MS(lag)}M</b></span>
     </div>
     <div class="graph-block">
       <div class="graph-title-row">
@@ -1075,7 +1065,10 @@ function drawGraph(svg, history, threshold, valueKey, label, rangeMinutes = 30, 
   const tMin = tsArr[0], tMax = tsArr[tsArr.length - 1];
   const tSpan = Math.max(1, tMax - tMin);
   const dataMax = Math.max(...valArr, threshold);
-  const step = _niceStep(Math.max(threshold * 1.25, dataMax * 1.1));
+  // Tick step: halved so the labelled axis shows 0.5M-style increments
+  // instead of the default 1M-style. ymax is rounded to the nearest step
+  // multiple so the top of the chart aligns with a tick label.
+  const step = _niceStep(Math.max(threshold * 1.25, dataMax * 1.1)) / 2;
   const ymax = Math.ceil(Math.max(threshold * 1.25, dataMax * 1.1) / step) * step;
 
   const lastVal = valArr[valArr.length - 1];
@@ -1093,12 +1086,8 @@ function drawGraph(svg, history, threshold, valueKey, label, rangeMinutes = 30, 
   const path = pts.map((p, i) => (i ? `L${p[0].toFixed(1)},${p[1].toFixed(1)}` : `M${p[0].toFixed(1)},${p[1].toFixed(1)}`)).join('');
   const fill = `${path} L${(padL + innerW).toFixed(1)},${(padT + innerH).toFixed(1)} L${padL.toFixed(1)},${(padT + innerH).toFixed(1)} Z`;
 
-  // y-axis ticks (major + minor) ------------------------------------------
+  // y-axis ticks (gridline + label per `step`) ----------------------------
   let yAxis = '';
-  for (let v = step / 2; v < ymax; v += step) {
-    const y = yOf(v);
-    yAxis += `\n      <line x1="${padL}" y1="${y.toFixed(1)}" x2="${padL + innerW}" y2="${y.toFixed(1)}" stroke="#1a1f27" stroke-width="0.5" />`;
-  }
   for (let v = 0; v <= ymax + 1; v += step) {
     const y = yOf(v);
     const isThresholdNear = Math.abs(v - threshold) < step / 4;
@@ -1107,7 +1096,7 @@ function drawGraph(svg, history, threshold, valueKey, label, rangeMinutes = 30, 
       yAxis += `\n      <text x="${padL - 8}" y="${(y + 3.5).toFixed(1)}" fill="#8b949e" font-size="10.5" font-family="JetBrains Mono, monospace" text-anchor="end">${(v / 1_000_000).toFixed(1)}M</text>`;
     }
   }
-  yAxis += `\n      <text x="${padL - 52}" y="${(padT + innerH / 2).toFixed(1)}" fill="#8b949e" font-size="10" font-family="Manrope, sans-serif" transform="rotate(-90 ${padL - 52} ${(padT + innerH / 2).toFixed(1)})" text-anchor="middle">Lag (messages)</text>`;
+  yAxis += `\n      <text x="${padL - 52}" y="${(padT + innerH / 2).toFixed(1)}" fill="#8b949e" font-size="10" font-family="Manrope, sans-serif" transform="rotate(-90 ${padL - 52} ${(padT + innerH / 2).toFixed(1)})" text-anchor="middle">Lag</text>`;
 
   // x-axis (range-aware) ---------------------------------------------------
   const fmtTick = (d) => {
