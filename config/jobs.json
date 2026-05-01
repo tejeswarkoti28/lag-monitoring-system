@@ -1,0 +1,61 @@
+{
+  "_comment": "Job catalog. Each entry is fanned out across `environments` so 9 jobs x 2 envs = 18 monitored consumer groups. Edit this file (no Python changes needed) to add/remove jobs.",
+  "threshold_messages": 4000000,
+  "environments": ["eus", "scus"],
+  "jobs": [
+    {
+      "topic": "canada-pno-offeringestion-events",
+      "consumer_group": "ca-priceoffer-3P-offer-ingestion-job-4",
+      "team": "PNO Team",
+      "channel": "#pno-team"
+    },
+    {
+      "topic": "canada-pno-offerranked-events",
+      "consumer_group": "ca-priceoffer-clearcache-5",
+      "team": "PNO Team",
+      "channel": "#pno-team"
+    },
+    {
+      "topic": "ca-price-offer-unifiedrollup-offer-events",
+      "consumer_group": "ca-priceoffer-rollup",
+      "team": "PNO Team",
+      "channel": "#pno-team"
+    },
+    {
+      "topic": "ca-price-offer-unifiedrollup-invent",
+      "consumer_group": "ca-priceoffer-rollup-inventory",
+      "team": "PNO Team",
+      "channel": "#pno-team"
+    },
+    {
+      "topic": "canada-pno-shipping-region",
+      "consumer_group": "ca-priceoffer-shipping-trigger-job-10",
+      "team": "Shipping Team",
+      "channel": "#shipping-team"
+    },
+    {
+      "topic": "canada-catalog-sku-index-events",
+      "consumer_group": "ca-catalog-product-ingestion-prod",
+      "team": "Catalog Team",
+      "channel": "#catalog-team"
+    },
+    {
+      "topic": "canada-catalog-sku-events",
+      "consumer_group": "ca-catalog-sku-stager-21-prod",
+      "team": "Catalog Team",
+      "channel": "#catalog-team"
+    },
+    {
+      "topic": "canada-catalog-delta-feed-products",
+      "consumer_group": "ca-usp-catalog-adapter-prod-g1",
+      "team": "Catalog Team",
+      "channel": "#catalog-team"
+    },
+    {
+      "topic": "canada-pno-shippingPriceCalculation",
+      "consumer_group": "ca-priceoffer-shippingPrice-calculation",
+      "team": "Shipping Team",
+      "channel": "#shipping-team"
+    }
+  ]
+}

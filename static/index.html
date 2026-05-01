@@ -484,6 +484,169 @@
 
   /* Spinner */
   .loading { color: var(--text-mute); font-size: 12px; padding: 20px; text-align: center; }
+
+  /* Static range label (replaces the old range button bar) */
+  .range-static {
+    color: var(--text-mute);
+    font-size: 10.5px; font-weight: 600;
+    letter-spacing: 0.5px;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 4px 9px;
+  }
+
+  /* =====================================================================
+     AI Assistant — floating button + slide-in chat panel
+     ===================================================================== */
+  .ai-fab {
+    position: fixed; right: 22px; bottom: 22px;
+    width: 56px; height: 56px; border-radius: 50%;
+    background: linear-gradient(135deg, #58a6ff 0%, #bc8cff 100%);
+    border: 0; cursor: pointer; color: white;
+    display: grid; place-items: center;
+    box-shadow: 0 6px 20px rgba(88, 166, 255, 0.35);
+    z-index: 90; transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .ai-fab:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(88, 166, 255, 0.5); }
+  .ai-fab svg { width: 24px; height: 24px; }
+  .ai-fab .dot-tag {
+    position: absolute; top: -4px; right: -4px;
+    background: var(--green); width: 12px; height: 12px; border-radius: 50%;
+    border: 2px solid var(--bg-0);
+  }
+  .ai-fab.disabled { background: var(--bg-3); cursor: not-allowed; box-shadow: none; opacity: 0.6; }
+  .ai-fab.disabled .dot-tag { display: none; }
+
+  .ai-panel {
+    position: fixed; top: 0; right: -460px; bottom: 0;
+    width: 440px; max-width: 92vw;
+    background: var(--bg-1);
+    border-left: 1px solid var(--line-2);
+    box-shadow: -20px 0 60px rgba(0, 0, 0, 0.45);
+    z-index: 95;
+    display: flex; flex-direction: column;
+    transition: right 0.22s ease-out;
+  }
+  .ai-panel.open { right: 0; }
+
+  .ai-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, #131820 0%, #11151a 100%);
+  }
+  .ai-head-title { display: flex; align-items: center; gap: 10px; }
+  .ai-head-title .ai-icon {
+    width: 26px; height: 26px; border-radius: 6px;
+    background: linear-gradient(135deg, #58a6ff 0%, #bc8cff 100%);
+    display: grid; place-items: center; color: white;
+  }
+  .ai-head-title h3 { margin: 0; font-size: 14px; font-weight: 700; }
+  .ai-head-title .sub { font-size: 11px; color: var(--text-mute); margin-top: 1px; }
+  .ai-close {
+    background: transparent; border: 0; color: var(--text-dim);
+    font-size: 22px; cursor: pointer; padding: 0 6px;
+  }
+
+  .ai-msgs {
+    flex: 1; overflow-y: auto;
+    padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;
+  }
+  .ai-msg {
+    max-width: 90%; line-height: 1.5;
+    font-size: 13px;
+    padding: 10px 12px; border-radius: 8px;
+    word-wrap: break-word; overflow-wrap: anywhere;
+  }
+  .ai-msg.user {
+    background: #1a2330; color: var(--text);
+    align-self: flex-end;
+    border: 1px solid #243049;
+  }
+  .ai-msg.assistant {
+    background: var(--bg-2); color: var(--text);
+    align-self: flex-start;
+    border: 1px solid var(--line);
+  }
+  .ai-msg.assistant b, .ai-msg.assistant strong { color: var(--text); font-weight: 700; }
+  .ai-msg.assistant code {
+    background: #0e1218; border: 1px solid var(--line);
+    padding: 1px 5px; border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  }
+  .ai-msg.assistant pre {
+    background: #0a0d11; border: 1px solid var(--line);
+    padding: 10px; border-radius: 5px; overflow-x: auto;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    margin: 6px 0;
+  }
+  .ai-msg.system {
+    align-self: center; background: transparent;
+    color: var(--text-mute); font-size: 11px;
+    padding: 8px 12px; font-style: italic;
+  }
+  .ai-msg.error {
+    background: #1c1015; border: 1px solid #6d2c2c; color: var(--red);
+    align-self: flex-start;
+  }
+  .ai-thinking {
+    align-self: flex-start; display: inline-flex; gap: 5px;
+    padding: 10px 14px; background: var(--bg-2); border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+  .ai-thinking span {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--text-dim);
+    animation: ai-pulse 1.2s infinite;
+  }
+  .ai-thinking span:nth-child(2) { animation-delay: 0.15s; }
+  .ai-thinking span:nth-child(3) { animation-delay: 0.30s; }
+  @keyframes ai-pulse {
+    0%, 80%, 100% { opacity: 0.3; transform: scale(0.85); }
+    40%           { opacity: 1;   transform: scale(1); }
+  }
+  .ai-tool-tag {
+    display: inline-block;
+    margin: 2px 4px 2px 0;
+    font: 600 10px 'JetBrains Mono', monospace;
+    color: var(--purple);
+    background: #1e1730;
+    border: 1px solid #3d3155;
+    border-radius: 3px;
+    padding: 2px 6px;
+    letter-spacing: 0.4px;
+  }
+
+  .ai-suggest {
+    padding: 0 16px 8px 16px; display: flex; gap: 6px; flex-wrap: wrap;
+  }
+  .ai-suggest button {
+    background: var(--bg-2); border: 1px solid var(--line);
+    color: var(--text-dim); border-radius: 14px;
+    padding: 5px 11px; font-size: 11.5px; cursor: pointer;
+    transition: border-color 0.1s, color 0.1s;
+  }
+  .ai-suggest button:hover { border-color: var(--blue); color: var(--text); }
+
+  .ai-input-row {
+    display: flex; gap: 8px; padding: 12px 14px;
+    border-top: 1px solid var(--line); background: var(--bg-1);
+  }
+  .ai-input {
+    flex: 1; resize: none; min-height: 38px; max-height: 120px;
+    background: var(--bg-2); border: 1px solid var(--line);
+    color: var(--text); border-radius: 6px;
+    padding: 9px 11px;
+    font: 13px 'Manrope', sans-serif;
+    outline: none;
+  }
+  .ai-input:focus { border-color: var(--blue); }
+  .ai-send {
+    background: var(--blue); color: white; border: 0; border-radius: 6px;
+    padding: 0 14px; font-weight: 700; cursor: pointer;
+    font-size: 13px; transition: background 0.15s;
+  }
+  .ai-send:hover { background: #4593f0; }
+  .ai-send:disabled { background: var(--bg-3); color: var(--text-mute); cursor: not-allowed; }
 </style>
 </head>
 <body>
@@ -582,6 +745,56 @@
     </div>
   </div>
 </div>
+
+<!-- =====================================================================
+     AI Assistant — slide-in panel + floating toggle button
+     ===================================================================== -->
+<button class="ai-fab" id="ai-fab" title="Ask the assistant" aria-label="Open AI assistant">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 2 L13.5 7.5 L19 9 L13.5 10.5 L12 16 L10.5 10.5 L5 9 L10.5 7.5 Z" />
+    <path d="M19 15 L19.8 17.2 L22 18 L19.8 18.8 L19 21 L18.2 18.8 L16 18 L18.2 17.2 Z" />
+  </svg>
+  <span class="dot-tag" id="ai-fab-dot"></span>
+</button>
+
+<aside class="ai-panel" id="ai-panel" aria-hidden="true">
+  <div class="ai-head">
+    <div class="ai-head-title">
+      <div class="ai-icon">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2 L13.5 7.5 L19 9 L13.5 10.5 L12 16 L10.5 10.5 L5 9 L10.5 7.5 Z" />
+        </svg>
+      </div>
+      <div>
+        <h3>AI Assistant</h3>
+        <div class="sub" id="ai-status-sub">Ready · powered by your live monitoring data</div>
+      </div>
+    </div>
+    <button class="ai-close" id="ai-close" aria-label="Close">×</button>
+  </div>
+
+  <div class="ai-msgs" id="ai-msgs">
+    <div class="ai-msg system">
+      Ask anything about your Kafka jobs — current status, recent breaches,
+      team comparisons, or postmortems. The assistant pulls live data from
+      this monitor; it doesn't see anything else.
+    </div>
+  </div>
+
+  <div class="ai-suggest" id="ai-suggest">
+    <button data-q="What's broken right now?">What's broken right now?</button>
+    <button data-q="How is Catalog Team doing this week?">Catalog this week</button>
+    <button data-q="Compare PNO Team breaches today vs yesterday">PNO today vs yesterday</button>
+    <button data-q="List every job you monitor">What do you monitor?</button>
+  </div>
+
+  <div class="ai-input-row">
+    <textarea class="ai-input" id="ai-input"
+      placeholder="Ask about your Kafka lag…  (Shift+Enter for newline)"
+      rows="1"></textarea>
+    <button class="ai-send" id="ai-send">Send</button>
+  </div>
+</aside>
 
 <script>
 // =============================================================================
@@ -852,14 +1065,11 @@ function renderFeed(alerts) {
 // =============================================================================
 // Modal — full graphs (Consumer Group / Topic Lag + Consumer Group Lag)
 // =============================================================================
-// Time-range presets shown in the per-graph selector.
+// Live window only — anything longer would be synthesized data, which we
+// no longer surface. When real Prometheus is wired up via DATA_SOURCE,
+// re-add longer ranges here and they'll resolve to real range queries.
 const RANGE_PRESETS = [
   { key: '30m', label: '30m', minutes: 30 },
-  { key: '6h',  label: '6h',  minutes: 360 },
-  { key: '24h', label: '24h', minutes: 1440 },
-  { key: '7d',  label: '7d',  minutes: 10080 },
-  { key: '30d', label: '30d', minutes: 43200 },
-  { key: '6mo', label: '6mo', minutes: 60 * 24 * 30 * 6 },
 ];
 function _presetForMinutes(minutes) {
   // pick the smallest preset >= minutes (so the alert is in-frame)
@@ -966,14 +1176,14 @@ function renderModalBody(jobId, activePresetKey) {
     <div class="graph-block">
       <div class="graph-title-row">
         <div class="graph-title">Consumer Group Lag <span id="meta-cg" style="color:var(--text-mute);font-size:11px;font-weight:500;margin-left:8px;"></span></div>
-        ${_buildRangeBar('cg', activePresetKey)}
+        <span class="range-static mono">live · last 30m</span>
       </div>
       <svg class="graph-svg" id="graph-cg" preserveAspectRatio="none"></svg>
     </div>
     <div class="graph-block">
       <div class="graph-title-row">
         <div class="graph-title">Consumer Group / Topic Lag <span id="meta-topic" style="color:var(--text-mute);font-size:11px;font-weight:500;margin-left:8px;"></span></div>
-        ${_buildRangeBar('topic', activePresetKey)}
+        <span class="range-static mono">live · last 30m</span>
       </div>
       <svg class="graph-svg" id="graph-topic" preserveAspectRatio="none"></svg>
     </div>
@@ -1420,6 +1630,202 @@ setInterval(refreshAlerts, 3000);
   };
   tryOpen();
 })();
+
+
+// =============================================================================
+// AI Assistant — chat panel logic
+// =============================================================================
+const AI_FAB = document.getElementById('ai-fab');
+const AI_FAB_DOT = document.getElementById('ai-fab-dot');
+const AI_PANEL = document.getElementById('ai-panel');
+const AI_CLOSE = document.getElementById('ai-close');
+const AI_MSGS = document.getElementById('ai-msgs');
+const AI_INPUT = document.getElementById('ai-input');
+const AI_SEND = document.getElementById('ai-send');
+const AI_SUGGEST = document.getElementById('ai-suggest');
+const AI_STATUS_SUB = document.getElementById('ai-status-sub');
+
+// Persists in-memory only — refresh = clean slate. Fine for v1.
+let _aiHistory = [];
+let _aiBusy = false;
+let _aiAvailable = null;
+
+function _aiEscape(s) {
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Tiny markdown -> HTML for assistant messages. Intentionally limited:
+//   **bold**, `code`, ```fenced```, paragraph breaks, simple lists.
+// We escape first, then re-introduce only the tags we generate.
+function _aiRenderMarkdown(text) {
+  let s = _aiEscape(text);
+  // Fenced code blocks
+  s = s.replace(/```([\s\S]*?)```/g, (_, code) =>
+    `<pre>${code.replace(/^\n/, '')}</pre>`);
+  // Inline code
+  s = s.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+  // Bold
+  s = s.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+  // Bullet lists (line-by-line)
+  const lines = s.split(/\n/);
+  let out = '';
+  let inList = false;
+  for (const ln of lines) {
+    const m = /^\s*[-*]\s+(.*)$/.exec(ln);
+    if (m) {
+      if (!inList) { out += '<ul style="margin:6px 0;padding-left:20px;">'; inList = true; }
+      out += `<li>${m[1]}</li>`;
+    } else {
+      if (inList) { out += '</ul>'; inList = false; }
+      out += ln + '<br>';
+    }
+  }
+  if (inList) out += '</ul>';
+  // Collapse trailing breaks
+  out = out.replace(/(<br>\s*){2,}/g, '<br><br>').replace(/<br>$/, '');
+  return out;
+}
+
+function _aiAddMessage(role, content, opts = {}) {
+  const div = document.createElement('div');
+  div.className = `ai-msg ${role}`;
+  if (role === 'assistant') {
+    div.innerHTML = _aiRenderMarkdown(content);
+    if (opts.toolCalls && opts.toolCalls.length) {
+      const tagDiv = document.createElement('div');
+      tagDiv.style.cssText = 'margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);';
+      for (const tc of opts.toolCalls) {
+        const tag = document.createElement('span');
+        tag.className = 'ai-tool-tag';
+        tag.textContent = tc.name;
+        tagDiv.appendChild(tag);
+      }
+      div.appendChild(tagDiv);
+    }
+  } else {
+    div.textContent = content;
+  }
+  AI_MSGS.appendChild(div);
+  AI_MSGS.scrollTop = AI_MSGS.scrollHeight;
+  return div;
+}
+
+function _aiAddThinking() {
+  const div = document.createElement('div');
+  div.className = 'ai-thinking';
+  div.id = 'ai-thinking';
+  div.innerHTML = '<span></span><span></span><span></span>';
+  AI_MSGS.appendChild(div);
+  AI_MSGS.scrollTop = AI_MSGS.scrollHeight;
+}
+
+function _aiRemoveThinking() {
+  const t = document.getElementById('ai-thinking');
+  if (t) t.remove();
+}
+
+async function _aiCheckAvailability() {
+  try {
+    const r = await fetch('/api/chat/health');
+    const j = await r.json();
+    _aiAvailable = !!j.available;
+  } catch (_e) {
+    _aiAvailable = false;
+  }
+  if (!_aiAvailable) {
+    AI_FAB.classList.add('disabled');
+    AI_FAB.title = 'Chatbot unavailable — set OPENAI_API_KEY in .env and restart';
+    AI_STATUS_SUB.textContent = 'Disabled — no LLM credentials configured';
+    AI_STATUS_SUB.style.color = 'var(--red)';
+    AI_SEND.disabled = true;
+    AI_INPUT.disabled = true;
+    AI_INPUT.placeholder = 'Set OPENAI_API_KEY in .env to enable';
+  }
+}
+
+function _aiOpen() {
+  if (_aiAvailable === false) {
+    // Open anyway so user can see the disabled-state explanation
+    AI_PANEL.classList.add('open');
+    return;
+  }
+  AI_PANEL.classList.add('open');
+  AI_PANEL.setAttribute('aria-hidden', 'false');
+  setTimeout(() => AI_INPUT.focus(), 200);
+}
+function _aiClose() {
+  AI_PANEL.classList.remove('open');
+  AI_PANEL.setAttribute('aria-hidden', 'true');
+}
+
+async function _aiSend(message) {
+  if (_aiBusy || !message || !_aiAvailable) return;
+  _aiBusy = true;
+  AI_SEND.disabled = true;
+  AI_INPUT.value = '';
+  AI_SUGGEST.style.display = 'none';   // hide quick-prompts after first message
+
+  _aiAddMessage('user', message);
+  _aiHistory.push({ role: 'user', content: message });
+  _aiAddThinking();
+
+  try {
+    const r = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, history: _aiHistory.slice(0, -1) }),
+    });
+    _aiRemoveThinking();
+    if (!r.ok) {
+      const errText = await r.text();
+      _aiAddMessage('error', `Request failed (${r.status}): ${errText.slice(0, 300)}`);
+      return;
+    }
+    const data = await r.json();
+    _aiAddMessage('assistant', data.reply, { toolCalls: data.tool_calls });
+    _aiHistory.push({ role: 'assistant', content: data.reply });
+    // Keep history under a reasonable size
+    if (_aiHistory.length > 18) _aiHistory = _aiHistory.slice(-18);
+  } catch (e) {
+    _aiRemoveThinking();
+    _aiAddMessage('error', `Network error: ${e.message}`);
+  } finally {
+    _aiBusy = false;
+    AI_SEND.disabled = false;
+    AI_INPUT.focus();
+  }
+}
+
+// Wire up controls
+AI_FAB.addEventListener('click', _aiOpen);
+AI_CLOSE.addEventListener('click', _aiClose);
+AI_SEND.addEventListener('click', () => {
+  const msg = AI_INPUT.value.trim();
+  if (msg) _aiSend(msg);
+});
+AI_INPUT.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Enter' && !ev.shiftKey) {
+    ev.preventDefault();
+    const msg = AI_INPUT.value.trim();
+    if (msg) _aiSend(msg);
+  }
+});
+AI_INPUT.addEventListener('input', () => {
+  // auto-grow
+  AI_INPUT.style.height = 'auto';
+  AI_INPUT.style.height = Math.min(AI_INPUT.scrollHeight, 120) + 'px';
+});
+AI_SUGGEST.addEventListener('click', (ev) => {
+  const btn = ev.target.closest('button[data-q]');
+  if (!btn) return;
+  _aiSend(btn.dataset.q);
+});
+document.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Escape' && AI_PANEL.classList.contains('open')) _aiClose();
+});
+
+_aiCheckAvailability();
 </script>
 </body>
 </html>
