@@ -230,6 +230,144 @@ class AlertDB:
 
 
 # =============================================================================
+# Historical lag persistence
+# =============================================================================
+# Lenses (and Kafka) don't keep historical lag — only the current value. So
+# we store every poll ourselves in a `lag_history` table and serve longer
+# time-range views by downsampling at query time.
+#
+# Storage math: 18 jobs × 12 polls/min × 60 × 24 = ~311K rows/day → ~30 MB/day
+# in SQLite. With WAL mode + composite PK indexing, queries against 90 days
+# of data return in <50ms. A daily cleanup deletes rows older than the
+# configured retention window.
+
+_HISTORY_SCHEMA = """
+CREATE TABLE IF NOT EXISTS lag_history (
+    job_id TEXT NOT NULL,
+    ts INTEGER NOT NULL,
+    cg_lag INTEGER NOT NULL,
+    topic_lag INTEGER NOT NULL,
+    PRIMARY KEY (job_id, ts)
+);
+CREATE INDEX IF NOT EXISTS idx_lag_history_ts ON lag_history(ts);
+"""
+
+HISTORY_RETENTION_DAYS: int = int(os.environ.get("LAG_HISTORY_RETENTION_DAYS", "90"))
+
+
+class HistoryDB:
+    """Persistent time-series store for lag readings.
+
+    Same SQLite file as AlertDB; separate connection per call. SQLite WAL
+    handles concurrent reads while the Monitor is inserting.
+    """
+
+    def __init__(self, path: str) -> None:
+        self.path = path
+        self._init()
+
+    def _conn(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(self.path, isolation_level=None)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL;")
+        return conn
+
+    def _init(self) -> None:
+        with self._conn() as conn:
+            conn.executescript(_HISTORY_SCHEMA)
+
+    def insert_batch(self, rows: list[tuple[str, int, int, int]]) -> int:
+        """Bulk insert. Each row: (job_id, ts_seconds, cg_lag, topic_lag).
+        Duplicates on (job_id, ts) are silently ignored.
+        """
+        if not rows:
+            return 0
+        with self._conn() as conn:
+            conn.executemany(
+                "INSERT OR IGNORE INTO lag_history "
+                "(job_id, ts, cg_lag, topic_lag) VALUES (?, ?, ?, ?)",
+                rows,
+            )
+        return len(rows)
+
+    def query(
+        self,
+        *,
+        job_id: str,
+        start_ts: float,
+        end_ts: float,
+        bucket_seconds: int,
+    ) -> list[dict]:
+        """Return downsampled history. Buckets via integer division on `ts`,
+        averages cg_lag and topic_lag within each bucket.
+        """
+        bucket_seconds = max(1, int(bucket_seconds))
+        with self._conn() as conn:
+            rows = conn.execute(
+                """
+                SELECT
+                    (ts / ?) * ? AS bucket_ts,
+                    AVG(cg_lag) AS cg_lag,
+                    AVG(topic_lag) AS topic_lag
+                FROM lag_history
+                WHERE job_id = ? AND ts >= ? AND ts <= ?
+                GROUP BY bucket_ts
+                ORDER BY bucket_ts
+                """,
+                (bucket_seconds, bucket_seconds, job_id, int(start_ts), int(end_ts)),
+            ).fetchall()
+        out: list[dict] = []
+        for r in rows:
+            cg = int(r["cg_lag"] or 0)
+            tp = int(r["topic_lag"] or 0)
+            out.append({
+                "ts": datetime.fromtimestamp(int(r["bucket_ts"]), tz=timezone.utc)
+                          .replace(microsecond=0).isoformat(),
+                "cg_lag": cg,
+                "topic_lag": tp,
+                "lag": max(cg, tp),
+            })
+        return out
+
+    def cleanup_older_than(self, days: int) -> int:
+        """Delete rows older than `days`. Returns rowcount."""
+        cutoff = int(time.time()) - days * 86400
+        with self._conn() as conn:
+            cur = conn.execute("DELETE FROM lag_history WHERE ts < ?", (cutoff,))
+            return cur.rowcount or 0
+
+    def total_rows(self) -> int:
+        with self._conn() as conn:
+            row = conn.execute("SELECT COUNT(*) AS c FROM lag_history").fetchone()
+            return int(row["c"])
+
+
+def bucket_seconds_for(minutes: int) -> int:
+    """Pick a bucket size that returns ~500–720 points for the requested window.
+
+    Mapped to the 9 dashboard ranges:
+      30m  → raw 5s        (~360 pts)
+      6h   → 30s           (~720 pts)
+      12h  → 60s           (~720 pts)
+      24h  → 120s          (~720 pts)
+      2d   → 300s          (~576 pts)
+      15d  → 1800s         (~720 pts)
+      1mo  → 3600s         (~720 pts)
+      3mo  → 14400s        (~540 pts)
+      6mo  → 28800s        (~540 pts)
+    """
+    if minutes <= 30:        return 5
+    if minutes <= 360:       return 30
+    if minutes <= 720:       return 60
+    if minutes <= 1440:      return 120
+    if minutes <= 2880:      return 300
+    if minutes <= 21_600:    return 1800
+    if minutes <= 43_200:    return 3600
+    if minutes <= 129_600:   return 14400
+    return 28800
+
+
+# =============================================================================
 # Alert engine — pure edge-trigger, one alert per crossing
 # =============================================================================
 @dataclass
@@ -414,11 +552,13 @@ class Monitor:
         engine: AlertEngine,
         notifier: SlackNotifier,
         db: AlertDB,
+        history_db: HistoryDB,
     ) -> None:
         self.source = source
         self.engine = engine
         self.notifier = notifier
         self.db = db
+        self.history_db = history_db
         self.jobs: dict[str, JobState] = {}
         self.last_poll_ts: Optional[datetime] = None
         self._task: Optional[asyncio.Task] = None
@@ -433,10 +573,22 @@ class Monitor:
     def warmup(self, minutes: int = WARMUP_MINUTES) -> None:
         now = time.time()
         steps = int((minutes * 60) / POLL_INTERVAL_SECONDS)
+        # For the simulator, we can fabricate history retroactively — useful
+        # so the dashboard isn't blank on first launch. For real Lenses, this
+        # is a no-op (LensesDataSource.synthesize_history returns []).
         for i in range(steps, 0, -1):
             ts = now - i * POLL_INTERVAL_SECONDS
-            for r in self.source.poll_all(at=ts):
-                self._record_history(r)
+            readings = self.source.poll_all(at=ts)
+            batch: list[tuple[str, int, int, int]] = []
+            for r in readings:
+                self._record_history(r, persist=False)
+                batch.append((
+                    r.job_id,
+                    int(r.timestamp.timestamp()),
+                    r.consumer_group_lag,
+                    r.topic_lag,
+                ))
+            self.history_db.insert_batch(batch)
 
     async def run(self) -> None:
         try:
@@ -451,14 +603,26 @@ class Monitor:
 
     async def _poll_once(self) -> None:
         readings = self.source.poll_all()
+        batch: list[tuple[str, int, int, int]] = []
         for r in readings:
-            self._record_history(r)
+            self._record_history(r, persist=False)
+            batch.append((
+                r.job_id,
+                int(r.timestamp.timestamp()),
+                r.consumer_group_lag,
+                r.topic_lag,
+            ))
             event = self.engine.evaluate(r)
             if event is not None:
                 await self._handle_event(event)
+        self.history_db.insert_batch(batch)
         self.last_poll_ts = now_utc()
 
-    def _record_history(self, r: LagReading) -> None:
+    def _record_history(self, r: LagReading, *, persist: bool = True) -> None:
+        """Update the in-memory ring (used for live sparklines on the job grid)
+        and optionally persist to HistoryDB. Persist is False during warmup
+        and inside _poll_once because both batch the SQLite write themselves.
+        """
         st = self.jobs.get(r.job_id)
         if st is None:
             return
@@ -474,6 +638,11 @@ class Monitor:
             h for h in st.history
             if datetime.fromisoformat(h["ts"]).timestamp() >= cutoff
         ]
+        if persist:
+            self.history_db.insert_batch([(
+                r.job_id, int(r.timestamp.timestamp()),
+                r.consumer_group_lag, r.topic_lag,
+            )])
 
     async def _handle_event(self, event: AlertEvent) -> None:
         delivered = await self.notifier.send(event)
@@ -509,8 +678,9 @@ class Monitor:
 _source: DataSource = get_data_source(catalog=JOB_CATALOG, environments=ENVIRONMENTS)
 _engine = AlertEngine()
 _db = AlertDB(DB_PATH)
+_history_db = HistoryDB(DB_PATH)
 _notifier = SlackNotifier()
-_monitor = Monitor(_source, _engine, _notifier, _db)
+_monitor = Monitor(_source, _engine, _notifier, _db, _history_db)
 
 
 # Chatbot — only constructed if the configured LLM provider has credentials.
@@ -528,7 +698,8 @@ def _build_chatbot():
         print(f"[chatbot] disabled — {exc}", file=sys.stderr)
         return None
     tools = ToolRegistry(
-        monitor=_monitor, db=_db, source=_source, threshold=THRESHOLD_MESSAGES,
+        monitor=_monitor, db=_db, history_db=_history_db,
+        source=_source, threshold=THRESHOLD_MESSAGES,
     )
     return Chatbot(llm=llm, tools=tools)
 
@@ -538,6 +709,14 @@ _chatbot = _build_chatbot()
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    # One-shot retention enforcement at startup. For long-running deployments
+    # consider promoting this to a daily background task — see CLAUDE.md.
+    try:
+        deleted = _history_db.cleanup_older_than(HISTORY_RETENTION_DAYS)
+        if deleted:
+            print(f"[history] purged {deleted} rows older than {HISTORY_RETENTION_DAYS} days")
+    except Exception as exc:
+        print(f"[history] cleanup failed: {exc}", file=sys.stderr)
     _monitor.warmup(minutes=WARMUP_MINUTES)
     _monitor.start()
     try:
@@ -626,19 +805,23 @@ def status():
 
 
 # Per-job history ------------------------------------------------------------
+# Reads from the persistent lag_history table with downsampling chosen to
+# return ~500–720 points regardless of window. Capped at the configured
+# retention window (default 90 days), so the longest range buttons (3mo /
+# 6mo) only return data if the app has been running long enough to collect it.
 @app.get("/api/job/{job_id}/history")
 def job_history(job_id: str, minutes: int = 30):
     st = _monitor.jobs.get(job_id)
     if st is None:
         raise HTTPException(status_code=404, detail=f"unknown job_id: {job_id}")
-    minutes = max(1, min(minutes, HISTORY_RETENTION_MINUTES))   # capped to live buffer
+    max_minutes = HISTORY_RETENTION_DAYS * 24 * 60
+    minutes = max(1, min(minutes, max_minutes))
     end_ts = time.time()
     start_ts = end_ts - minutes * 60
-
-    series = [
-        h for h in st.history
-        if datetime.fromisoformat(h["ts"]).timestamp() >= start_ts
-    ]
+    bucket = bucket_seconds_for(minutes)
+    series = _history_db.query(
+        job_id=job_id, start_ts=start_ts, end_ts=end_ts, bucket_seconds=bucket,
+    )
     return {
         "job_id": job_id,
         "topic": st.topic,
@@ -648,7 +831,7 @@ def job_history(job_id: str, minutes: int = 30):
         "channel": st.channel,
         "threshold": THRESHOLD_MESSAGES,
         "minutes": minutes,
-        "step_seconds": POLL_INTERVAL_SECONDS,
+        "step_seconds": bucket,
         "history": series,
     }
 

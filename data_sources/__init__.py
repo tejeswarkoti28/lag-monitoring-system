@@ -18,7 +18,8 @@ def get_data_source(catalog: list[dict], environments: list[str]) -> DataSource:
     """Factory: pick a DataSource implementation based on env config.
 
     DATA_SOURCE=simulator  (default) — synthetic data, runs anywhere, no creds
-    DATA_SOURCE=prometheus            — queries a real Prometheus / TSDB
+    DATA_SOURCE=lenses                — Lenses REST API (production target)
+    DATA_SOURCE=prometheus            — Prometheus / TSDB (alternative)
     """
     kind = os.environ.get("DATA_SOURCE", "simulator").lower().strip()
 
@@ -26,13 +27,17 @@ def get_data_source(catalog: list[dict], environments: list[str]) -> DataSource:
         from .simulator import SimulatedDataSource
         return SimulatedDataSource(catalog=catalog, environments=environments)
 
+    if kind == "lenses":
+        from .lenses import LensesDataSource
+        return LensesDataSource(catalog=catalog, environments=environments)
+
     if kind == "prometheus":
         from .prometheus import PrometheusDataSource
         return PrometheusDataSource(catalog=catalog, environments=environments)
 
     raise ValueError(
         f"Unknown DATA_SOURCE={kind!r}. "
-        f"Supported: 'simulator', 'prometheus'."
+        f"Supported: 'simulator', 'lenses', 'prometheus'."
     )
 
 

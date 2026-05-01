@@ -1065,11 +1065,20 @@ function renderFeed(alerts) {
 // =============================================================================
 // Modal — full graphs (Consumer Group / Topic Lag + Consumer Group Lag)
 // =============================================================================
-// Live window only — anything longer would be synthesized data, which we
-// no longer surface. When real Prometheus is wired up via DATA_SOURCE,
-// re-add longer ranges here and they'll resolve to real range queries.
+// Time-range presets. Backed by the SQLite lag_history table — the longer
+// ranges only have data once the monitor has been running long enough to
+// collect it. Bucketing is done server-side; the dashboard never sees more
+// than ~720 points regardless of which range is selected.
 const RANGE_PRESETS = [
   { key: '30m', label: '30m', minutes: 30 },
+  { key: '6h',  label: '6h',  minutes: 360 },
+  { key: '12h', label: '12h', minutes: 720 },
+  { key: '24h', label: '24h', minutes: 1440 },
+  { key: '2d',  label: '2d',  minutes: 2880 },
+  { key: '15d', label: '15d', minutes: 21600 },
+  { key: '1mo', label: '1mo', minutes: 43200 },
+  { key: '3mo', label: '3mo', minutes: 129600 },
+  { key: '6mo', label: '6mo', minutes: 259200 },
 ];
 function _presetForMinutes(minutes) {
   // pick the smallest preset >= minutes (so the alert is in-frame)
@@ -1176,14 +1185,14 @@ function renderModalBody(jobId, activePresetKey) {
     <div class="graph-block">
       <div class="graph-title-row">
         <div class="graph-title">Consumer Group Lag <span id="meta-cg" style="color:var(--text-mute);font-size:11px;font-weight:500;margin-left:8px;"></span></div>
-        <span class="range-static mono">live · last 30m</span>
+        ${_buildRangeBar('cg', activePresetKey)}
       </div>
       <svg class="graph-svg" id="graph-cg" preserveAspectRatio="none"></svg>
     </div>
     <div class="graph-block">
       <div class="graph-title-row">
         <div class="graph-title">Consumer Group / Topic Lag <span id="meta-topic" style="color:var(--text-mute);font-size:11px;font-weight:500;margin-left:8px;"></span></div>
-        <span class="range-static mono">live · last 30m</span>
+        ${_buildRangeBar('topic', activePresetKey)}
       </div>
       <svg class="graph-svg" id="graph-topic" preserveAspectRatio="none"></svg>
     </div>

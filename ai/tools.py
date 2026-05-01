@@ -130,9 +130,18 @@ TOOL_DEFS: list[dict] = [
 class ToolRegistry:
     """Executes tool calls against the running app's data layer."""
 
-    def __init__(self, *, monitor: Any, db: Any, source: Any, threshold: int) -> None:
+    def __init__(
+        self,
+        *,
+        monitor: Any,
+        db: Any,
+        history_db: Any,
+        source: Any,
+        threshold: int,
+    ) -> None:
         self.monitor = monitor
         self.db = db
+        self.history_db = history_db
         self.source = source
         self.threshold = threshold
 
@@ -229,30 +238,24 @@ class ToolRegistry:
         return {"window_hours": hours, "teams": out}
 
     def get_job_history(self, job_id: str, minutes: int = 60) -> dict:
-        minutes = max(1, min(int(minutes), 60 * 24 * 31 * 6))
+        minutes = max(1, min(int(minutes), 60 * 24 * 90))   # cap at 90 days
         st = self.monitor.jobs.get(job_id)
         if st is None:
             return {"error": f"unknown job_id: {job_id}"}
         end_ts = time.time()
         start_ts = end_ts - minutes * 60
-
-        if minutes <= 60:
-            series = [
-                h for h in st.history
-                if datetime.fromisoformat(h["ts"]).timestamp() >= start_ts
-            ]
-        else:
-            # Delegate to the data source — sim cooks it up, real source queries TSDB
-            step = 30.0 if minutes <= 360 else 120.0
-            series = self.source.synthesize_history(
-                job_id, start_ts=start_ts, end_ts=end_ts, step_seconds=step,
-            )
-
-        # Trim payload — too many points overflow the LLM context
+        # Use the same bucketing the dashboard uses, so the LLM sees the
+        # same shape the human would see. For very long ranges keep the
+        # payload small so it fits in the model's context window.
+        from app import bucket_seconds_for     # local import to avoid cycle at module load
+        bucket = bucket_seconds_for(minutes)
+        series = self.history_db.query(
+            job_id=job_id, start_ts=start_ts, end_ts=end_ts, bucket_seconds=bucket,
+        )
+        # Cap at 120 points so the LLM context stays small even for 6-month windows
         if len(series) > 120:
             stride = max(1, len(series) // 120)
             series = series[::stride]
-
         return {
             "job_id": job_id,
             "topic": st.topic,
@@ -260,6 +263,7 @@ class ToolRegistry:
             "environment": st.environment,
             "team": st.team,
             "minutes": minutes,
+            "bucket_seconds": bucket,
             "threshold": self.threshold,
             "points": len(series),
             "history": series,
