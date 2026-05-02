@@ -58,6 +58,11 @@ class PrometheusDataSource(DataSource):
         # certs are signed by an internal CA Python doesn't trust by default.
         # Only safe when you're already inside the corporate network.
         self._client = httpx.Client(timeout=timeout_seconds, verify=verify_ssl)
+        # Optional Grafana session cookie for SSO-protected proxies.
+        # Set GRAFANA_COOKIE in .env to the value of the `grafana_session`
+        # cookie from your browser when reaching the dashboard works in-browser
+        # but fails from the app (302 redirect to SSO).
+        self._cookie = os.environ.get("GRAFANA_COOKIE", "").strip() or None
 
     @property
     def static_labels(self) -> dict:
@@ -155,6 +160,9 @@ class PrometheusDataSource(DataSource):
         return self.query_instant(expr)
 
     def _headers(self) -> dict:
+        h: dict = {}
         if self._auth_token:
-            return {"Authorization": f"Bearer {self._auth_token}"}
-        return {}
+            h["Authorization"] = f"Bearer {self._auth_token}"
+        if self._cookie:
+            h["Cookie"] = self._cookie
+        return h
