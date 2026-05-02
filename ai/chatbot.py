@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 from typing import Optional
 
-from .llm_client import LLMClient
+from .llm_client import GeminiClient
 from .prompts import SYSTEM_PROMPT
 from .tools import TOOL_DEFS, ToolRegistry
 
@@ -23,7 +23,7 @@ MAX_TOOL_HOPS = 6
 
 
 class Chatbot:
-    def __init__(self, *, llm: LLMClient, tools: ToolRegistry) -> None:
+    def __init__(self, *, llm: GeminiClient, tools: ToolRegistry) -> None:
         self._llm = llm
         self._tools = tools
 

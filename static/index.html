@@ -28,6 +28,7 @@
     --orange: #f0883e;
     --blue: #58a6ff;
     --purple: #bc8cff;
+    --grafana-green: #84d957;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
@@ -125,337 +126,27 @@
   .stat.alerts .stat-value { color: var(--orange); }
   .stat-sub { color: var(--text-mute); font-size: 11px; margin-top: 2px; }
 
-  /* Main */
-  .main {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 380px;
-    gap: 14px; padding: 14px 22px 22px 22px;
+  /* Controls bar (topic + time range) */
+  .controls {
+    display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+    padding: 14px 22px 0 22px;
   }
-  @media (max-width: 1100px) {
-    .main { grid-template-columns: 1fr; }
-    .stats { grid-template-columns: repeat(2, 1fr); }
+  .controls label {
+    font-size: 11px; color: var(--text-dim); text-transform: uppercase;
+    letter-spacing: 0.6px; font-weight: 600;
   }
-
-  .panel {
-    background: var(--bg-1);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-  }
-  .panel-header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 16px; border-bottom: 1px solid var(--line);
-  }
-  .panel-title {
-    font-size: 13px; font-weight: 700; letter-spacing: 0.2px;
-  }
-  .panel-meta { font-size: 11px; color: var(--text-mute); font-family: 'JetBrains Mono', monospace; }
-
-  /* Team sections — group cards by owning team */
-  .team-section { padding: 4px 0 6px 0; }
-  .team-section + .team-section { border-top: 1px solid var(--line); margin-top: 4px; }
-  .team-section-header {
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 12px; flex-wrap: wrap;
-    padding: 14px 18px 10px 18px;
-    border-bottom: 1px solid #1a1f27;
-    margin-bottom: 4px;
-  }
-  .team-section-title {
-    display: flex; align-items: center; gap: 12px;
-  }
-  .team-section-title h3 {
-    margin: 0;
-    font-size: 13px; font-weight: 700; letter-spacing: 0.4px;
-    text-transform: uppercase; color: var(--text);
-  }
-  .team-section-title .team-channel-tag {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 10.5px; font-weight: 600;
-    color: var(--text-dim);
-    background: var(--bg-2);
-    border: 1px solid var(--line);
-    border-radius: 3px;
-    padding: 2px 7px;
-    letter-spacing: 0.4px;
-  }
-  .team-section-stats {
-    display: flex; align-items: center; gap: 10px;
-    font-family: 'JetBrains Mono', monospace; font-size: 11px;
-    color: var(--text-mute);
-  }
-  .team-section-stats .pill {
-    padding: 2px 8px; border-radius: 3px;
-    border: 1px solid var(--line);
-    font-weight: 600; letter-spacing: 0.4px;
-  }
-  .team-section-stats .pill.healthy { color: var(--green); border-color: #2c5d39; background: #0e1d14; }
-  .team-section-stats .pill.breach  { color: var(--red);   border-color: #6d2c2c; background: #1c1015; }
-  .team-section-stats .pill.zero    { color: var(--text-mute); }
-  .team-section-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
-    gap: 10px; padding: 0 12px 12px 12px;
-  }
-
-  /* Job grid */
-  .job-grid {
-    /* Container is now a vertical stack of team-section blocks */
-    display: block;
-    padding: 4px 0 8px 0;
-  }
-  .card {
-    background: var(--bg-2);
-    border: 1px solid var(--line);
-    border-radius: 7px;
-    padding: 12px 14px 10px 14px;
-    position: relative; overflow: hidden;
-    cursor: pointer;
-    transition: transform 0.12s, border-color 0.12s, box-shadow 0.12s;
-  }
-  .card:hover { border-color: var(--line-2); transform: translateY(-1px); }
-  .card.breach {
-    border-color: #5a2828;
-    box-shadow: 0 0 0 1px #5a2828, 0 4px 14px rgba(248, 81, 73, 0.12);
-    background:
-      radial-gradient(circle at top right, rgba(248, 81, 73, 0.10), transparent 60%),
-      var(--bg-2);
-  }
-  .card.breach::before {
-    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1.5px;
-    background: linear-gradient(90deg, transparent, var(--red) 30%, var(--red) 70%, transparent);
-    opacity: 0.85;
-    animation: stripe 3.2s ease-in-out infinite;
-  }
-  @keyframes stripe {
-    0%, 100% { opacity: 0.45; }
-    50%      { opacity: 0.95; }
-  }
-  .card.breach .lag-value { color: var(--red); }
-  .card-top {
-    display: flex; align-items: flex-start; justify-content: space-between;
-    gap: 8px;
-  }
-  .topic {
-    font-family: 'JetBrains Mono', monospace; font-size: 12.5px;
-    font-weight: 500; word-break: break-all; line-height: 1.35;
-    color: var(--text);
-  }
-  .env-tag {
-    font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600;
-    padding: 3px 7px; border-radius: 3px;
-    background: var(--bg-3); color: var(--text-dim);
-    border: 1px solid var(--line);
-    letter-spacing: 0.6px;
-    flex-shrink: 0;
-  }
-  .env-tag.scus { color: var(--purple); border-color: #4e3d6e; background: #1d1626; }
-  .env-tag.eus  { color: var(--blue); border-color: #2a4d75; background: #131e2a; }
-
-  .meta {
-    display: flex; align-items: center; gap: 8px;
-    color: var(--text-mute); font-size: 11px; margin-top: 6px;
-  }
-  .meta .channel { font-family: 'JetBrains Mono', monospace; color: var(--text-dim); }
-  .meta-sep { color: var(--line-2); }
-
-  .spark {
-    margin-top: 10px;
-    width: 100%; height: 38px; display: block;
-    opacity: 0.95;
-  }
-  .card:hover .spark { opacity: 1; }
-
-  .card-bottom {
-    display: flex; align-items: baseline; justify-content: space-between;
-    margin-top: 6px;
-  }
-  .lag-value {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 19px; font-weight: 600;
-    color: var(--text);
-  }
-  .lag-unit { color: var(--text-mute); font-size: 12px; margin-left: 3px; font-weight: 500; }
-  .badge {
-    font-size: 10px; font-weight: 700; letter-spacing: 0.7px;
-    padding: 3px 8px; border-radius: 3px;
-    background: var(--green-soft); color: var(--green);
-    border: 1px solid #2c5d39;
-  }
-  .badge.breach { background: var(--red-soft); color: var(--red); border-color: #6d2c2c; }
-  .badge.injecting { background: #f0883e22; color: var(--orange); border-color: #6e4824; margin-left: 6px; }
-
-  /* Control panel */
-  .control-panel {
-    padding: 12px 16px 14px 16px;
-    border-top: 1px solid var(--line);
-    background: linear-gradient(180deg, #131820 0%, #11151a 100%);
-  }
-  .control-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .control-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.6px; font-weight: 600; }
   select, button {
     font-family: inherit; font-size: 13px;
     background: var(--bg-2); color: var(--text);
     border: 1px solid var(--line-2);
-    border-radius: 5px; padding: 7px 10px;
+    border-radius: 5px; padding: 7px 11px;
     cursor: pointer;
   }
-  select { font-family: 'JetBrains Mono', monospace; min-width: 280px; flex: 1; }
-  button.primary {
-    background: linear-gradient(180deg, #f0883e 0%, #d56e29 100%);
-    border-color: #b85f25; color: #1a0f06; font-weight: 700;
-    transition: transform 0.08s, box-shadow 0.12s;
-  }
-  button.primary:hover { box-shadow: 0 0 14px #f0883e55; }
-  button.primary:active { transform: translateY(1px); }
-  button.primary.success {
-    background: linear-gradient(180deg, #3fb950 0%, #2da744 100%);
-    border-color: #2c8a3e; color: #061a0a;
-  }
-  button.secondary {
-    background: var(--bg-3); color: var(--text);
-    transition: transform 0.08s, box-shadow 0.12s;
-  }
-  button.secondary:hover { background: #2a323d; }
-  button.secondary:active { transform: translateY(1px); }
-  button.secondary.success {
-    background: linear-gradient(180deg, #3fb950 0%, #2da744 100%);
-    border-color: #2c8a3e; color: #061a0a;
-  }
-  .stream-picker {
-    display: inline-flex; gap: 12px; align-items: center;
-    background: var(--bg-2);
-    border: 1px solid var(--line);
-    border-radius: 5px;
-    padding: 4px 10px;
-    font-size: 11.5px;
-    color: var(--text-dim);
-    font-family: 'JetBrains Mono', monospace;
-  }
-  .stream-picker label {
-    display: inline-flex; align-items: center; gap: 5px;
-    cursor: pointer;
-    padding: 1px 2px;
-  }
-  .stream-picker input[type="radio"] { accent-color: var(--orange); }
-  .stream-picker label:has(input:checked) { color: var(--text); }
+  select { font-family: 'JetBrains Mono', monospace; min-width: 360px; }
   button:disabled { opacity: 0.6; cursor: not-allowed; }
-  .control-help { color: var(--text-mute); font-size: 11px; margin-top: 8px; }
 
-
-  /* Alert feed */
-  .feed {
-    padding: 8px 12px 12px 12px;
-    max-height: 720px; overflow-y: auto;
-  }
-  .feed::-webkit-scrollbar { width: 6px; }
-  .feed::-webkit-scrollbar-track { background: var(--bg-1); }
-  .feed::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 3px; }
-
-  .alert {
-    background: var(--bg-2);
-    border: 1px solid var(--line);
-    border-left: 3px solid var(--red);
-    padding: 7px 10px; margin-bottom: 5px;
-    border-radius: 4px;
-    animation: slideIn 0.25s ease;
-  }
-  .alert.resolved { border-left-color: var(--green); }
-  @keyframes slideIn {
-    from { opacity: 0; transform: translateX(6px); }
-    to   { opacity: 1; transform: translateX(0); }
-  }
-  .alert-head {
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 8px;
-    margin-bottom: 3px;
-  }
-  .alert-type {
-    font-size: 9.5px; font-weight: 700; letter-spacing: 0.5px;
-    color: var(--red);
-    display: inline-flex; align-items: center; gap: 6px;
-  }
-  .alert.resolved .alert-type { color: var(--green); }
-  .alert-time { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; color: var(--text-mute); }
-  .alert-topic {
-    font-family: 'JetBrains Mono', monospace; font-size: 11.5px;
-    color: var(--text); word-break: break-all; line-height: 1.3;
-  }
-  .alert-meta {
-    margin-top: 3px; font-size: 10.5px; color: var(--text-dim);
-    display: flex; gap: 7px; flex-wrap: wrap; align-items: baseline;
-  }
-  .alert-meta .lag {
-    color: var(--text);
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 600; font-size: 11.5px;
-  }
-  .alert-meta .lag.over {
-    color: var(--red);
-  }
-  .alert-meta .threshold-mini {
-    color: var(--text-mute); font-size: 10px;
-  }
-  .delivered {
-    display: inline-block;
-    margin-left: 4px;
-    font-size: 9.5px; font-weight: 700; letter-spacing: 0.5px;
-    color: var(--green);
-  }
-  .empty {
-    color: var(--text-mute); font-size: 12px; text-align: center;
-    padding: 30px 10px; font-style: italic;
-  }
-
-  /* Modal */
-  .modal-wrap {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.65);
-    display: none; align-items: center; justify-content: center;
-    z-index: 100; padding: 30px;
-  }
-  .modal-wrap.open { display: flex; }
-  .modal {
-    background: var(--bg-1); border: 1px solid var(--line-2);
-    border-radius: 10px; max-width: 920px; width: 100%;
-    max-height: 90vh; overflow: auto;
-    box-shadow: 0 30px 80px #000a;
-  }
-  .modal-head {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 14px 18px; border-bottom: 1px solid var(--line);
-  }
-  .modal-head h2 {
-    margin: 0; font-size: 14px; font-weight: 700;
-    font-family: 'JetBrains Mono', monospace; word-break: break-all;
-  }
-  .modal-close {
-    background: transparent; border: none; color: var(--text-dim);
-    font-size: 22px; cursor: pointer; padding: 0 6px;
-  }
-  .modal-body { padding: 16px 18px 22px 18px; }
-  .modal-meta {
-    display: flex; gap: 14px; flex-wrap: wrap;
-    font-size: 12px; color: var(--text-dim); margin-bottom: 12px;
-  }
-  .modal-meta b { color: var(--text); font-weight: 600; }
-  .graph-block {
-    background: var(--bg-2); border: 1px solid var(--line);
-    border-radius: 6px; padding: 10px 12px; margin-bottom: 12px;
-  }
-  .graph-title {
-    font-size: 11px; color: var(--text-dim); text-transform: uppercase;
-    letter-spacing: 0.5px; font-weight: 700; margin-bottom: 6px;
-  }
-  .graph-svg { width: 100%; height: 220px; display: block; cursor: crosshair; }
-  .graph-title-row {
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 12px; flex-wrap: wrap;
-    padding: 10px 14px 6px 14px;
-    border-bottom: 1px solid var(--line);
-    background: linear-gradient(180deg, #161b22 0%, #11151a 100%);
-  }
-  .graph-title-row .graph-title { padding: 0; border: 0; background: none; }
   .range-group {
-    display: inline-flex; gap: 0;
+    display: inline-flex;
     background: var(--bg-2);
     border: 1px solid var(--line);
     border-radius: 5px;
@@ -466,11 +157,10 @@
     color: var(--text-dim);
     border: 0;
     border-right: 1px solid var(--line);
-    padding: 4px 9px;
-    font: 600 10.5px 'JetBrains Mono', monospace;
+    padding: 5px 10px;
+    font: 600 11px 'JetBrains Mono', monospace;
     letter-spacing: 0.5px;
     cursor: pointer;
-    transition: background 0.1s, color 0.1s;
   }
   .range-btn:last-child { border-right: 0; }
   .range-btn:hover { background: var(--bg-3); color: var(--text); }
@@ -479,26 +169,186 @@
     color: var(--blue);
     box-shadow: inset 0 -2px 0 var(--blue);
   }
-  .alert { cursor: pointer; transition: border-color 0.1s, transform 0.1s; }
-  .alert:hover { border-color: var(--line-2); transform: translateX(-1px); }
 
-  /* Spinner */
-  .loading { color: var(--text-mute); font-size: 12px; padding: 20px; text-align: center; }
-
-  /* Static range label (replaces the old range button bar) */
-  .range-static {
-    color: var(--text-mute);
-    font-size: 10.5px; font-weight: 600;
-    letter-spacing: 0.5px;
-    background: var(--bg-2);
-    border: 1px solid var(--line);
-    border-radius: 5px;
-    padding: 4px 9px;
+  /* Main layout: env columns on left, alert feed on right */
+  .main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 380px;
+    gap: 14px; padding: 14px 22px 22px 22px;
+  }
+  @media (max-width: 1100px) {
+    .main { grid-template-columns: 1fr; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
   }
 
-  /* =====================================================================
-     AI Assistant — floating button + slide-in chat panel
-     ===================================================================== */
+  .env-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+  @media (max-width: 1500px) {
+    .env-grid { grid-template-columns: 1fr; }
+  }
+
+  /* Environment block */
+  .env-block {
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+  .env-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, #131820 0%, #11151a 100%);
+  }
+  .env-name {
+    font-size: 12px; font-weight: 700; letter-spacing: 0.8px;
+    text-transform: uppercase;
+  }
+  .env-name .env-dot {
+    display: inline-block; width: 7px; height: 7px;
+    border-radius: 50%; margin-right: 7px;
+    background: var(--green);
+  }
+  .env-name.unhealthy .env-dot { background: var(--red); }
+  .env-meta {
+    font: 600 10.5px 'JetBrains Mono', monospace;
+    color: var(--text-mute);
+  }
+
+  /* Section header inside an env block */
+  .section-head {
+    padding: 10px 16px 6px 16px;
+    font: 600 10.5px 'JetBrains Mono', monospace;
+    color: var(--text-dim);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  /* Panel — one chart */
+  .panel {
+    padding: 8px 12px 12px 12px;
+    border-top: 1px solid #1a1f27;
+  }
+  .panel:first-of-type { border-top: 0; }
+  .panel-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 12px; padding: 4px 4px 6px 4px;
+  }
+  .panel-title {
+    font-size: 12px; font-weight: 600; color: var(--text);
+  }
+  .panel-stats {
+    font: 500 10.5px 'JetBrains Mono', monospace;
+    color: var(--text-mute);
+  }
+  .panel-stats b { color: var(--text); font-weight: 600; }
+  .panel-svg {
+    width: 100%; height: 130px; display: block;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+  }
+  .panel-empty {
+    height: 130px;
+    background: var(--bg-2);
+    border: 1px dashed var(--line);
+    border-radius: 4px;
+    display: grid; place-items: center;
+    color: var(--text-mute); font-size: 11.5px;
+  }
+  .panel-loading {
+    height: 130px;
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    display: grid; place-items: center;
+    color: var(--text-mute); font-size: 11.5px; font-style: italic;
+  }
+  .panel-error {
+    color: var(--red); font-size: 11px;
+    padding: 4px 6px;
+  }
+  .panel-legend {
+    margin-top: 6px;
+    font: 500 10.5px 'JetBrains Mono', monospace;
+    color: var(--text-mute);
+    display: flex; align-items: center; gap: 6px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .panel-legend .swatch {
+    display: inline-block; width: 8px; height: 8px; border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  /* Right column: live alert feed */
+  .panel-right {
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    height: fit-content; max-height: calc(100vh - 200px);
+    display: flex; flex-direction: column;
+  }
+  .panel-right-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px; border-bottom: 1px solid var(--line);
+  }
+  .panel-right-title { font-size: 13px; font-weight: 700; }
+  .panel-right-meta { font-size: 11px; color: var(--text-mute); font-family: 'JetBrains Mono', monospace; }
+  .feed {
+    padding: 8px 12px 12px 12px;
+    overflow-y: auto;
+  }
+  .feed::-webkit-scrollbar { width: 6px; }
+  .feed::-webkit-scrollbar-track { background: var(--bg-1); }
+  .feed::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 3px; }
+  .alert {
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 9px 11px;
+    margin-bottom: 8px;
+    font-size: 12px;
+  }
+  .alert-head {
+    display: flex; gap: 8px; align-items: center;
+    margin-bottom: 4px;
+  }
+  .alert-type {
+    font: 600 9.5px 'JetBrains Mono', monospace;
+    letter-spacing: 0.5px;
+    padding: 2px 6px; border-radius: 3px;
+  }
+  .alert-type.breach {
+    background: var(--red-soft); color: var(--red);
+    border: 1px solid #6d2c2c;
+  }
+  .alert-type.resolved {
+    background: var(--green-soft); color: var(--green);
+    border: 1px solid #2c5d39;
+  }
+  .alert-time {
+    color: var(--text-mute); font: 500 10.5px 'JetBrains Mono', monospace;
+    margin-left: auto;
+  }
+  .alert-topic { font-family: 'JetBrains Mono', monospace; color: var(--text); font-size: 11.5px; word-break: break-all; }
+  .alert-team { color: var(--text-dim); font-size: 11px; margin-top: 2px; }
+  .alert-lag { color: var(--text); font-weight: 600; font-size: 11.5px; }
+  .alert-delivered {
+    display: inline-block;
+    margin-left: 4px;
+    font-size: 9.5px; font-weight: 700;
+    color: var(--green);
+    letter-spacing: 0.5px;
+  }
+  .empty-state {
+    color: var(--text-mute); font-size: 12px; text-align: center;
+    padding: 30px 10px; font-style: italic;
+  }
+  .loading { color: var(--text-mute); font-size: 12px; padding: 20px; text-align: center; }
+
+  /* AI assistant panel + floating button */
   .ai-fab {
     position: fixed; right: 22px; bottom: 22px;
     width: 56px; height: 56px; border-radius: 50%;
@@ -506,7 +356,8 @@
     border: 0; cursor: pointer; color: white;
     display: grid; place-items: center;
     box-shadow: 0 6px 20px rgba(88, 166, 255, 0.35);
-    z-index: 90; transition: transform 0.15s, box-shadow 0.15s;
+    z-index: 90;
+    transition: transform 0.15s, box-shadow 0.15s;
   }
   .ai-fab:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(88, 166, 255, 0.5); }
   .ai-fab svg { width: 24px; height: 24px; }
@@ -615,7 +466,6 @@
     padding: 2px 6px;
     letter-spacing: 0.4px;
   }
-
   .ai-suggest {
     padding: 0 16px 8px 16px; display: flex; gap: 6px; flex-wrap: wrap;
   }
@@ -654,13 +504,13 @@
 <div class="brand">
   <div class="brand-left">
     <div class="logo">
-      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M3 17l4-4 4 4 4-8 6 6" stroke="#1a0f06" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 13h4l2-7 4 14 2-7h6" />
       </svg>
     </div>
     <div>
       <h1>Kafka Lag Monitor</h1>
-      <div class="subtitle">Walmart Canada · Catalog & Price-and-Offer · Real-time observability</div>
+      <div class="subtitle">Walmart Canada · Real-time observability + AI assistant</div>
     </div>
   </div>
   <div class="brand-right">
@@ -668,7 +518,7 @@
       <span class="dot"></span><span>Slack: not configured</span>
     </div>
     <div class="indicator">
-      <span class="dot live" id="poll-dot"></span><span>Polling 5s</span>
+      <span class="dot live" id="poll-dot"></span><span id="poll-label">Polling 5s</span>
     </div>
     <div class="clock" id="clock">--:--:--</div>
   </div>
@@ -683,7 +533,7 @@
   <div class="stat breach">
     <div class="stat-label">Breaching now</div>
     <div class="stat-value" id="stat-breaching">--</div>
-    <div class="stat-sub">≥ 4.00M messages</div>
+    <div class="stat-sub">≥ threshold</div>
   </div>
   <div class="stat healthy">
     <div class="stat-label">Healthy</div>
@@ -697,58 +547,28 @@
   </div>
 </div>
 
+<div class="controls">
+  <label for="topic-select">Topic</label>
+  <select id="topic-select"><option>Loading…</option></select>
+  <label>Range</label>
+  <div class="range-group" id="range-group" role="tablist"></div>
+  <span class="indicator" style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;" id="last-poll">last poll: --</span>
+</div>
+
 <div class="main">
-  <div>
-    <div class="panel">
-      <div class="panel-header">
-        <div class="panel-title">Consumer-group jobs · live status</div>
-        <div class="panel-meta" id="last-poll">last poll: --</div>
-      </div>
-      <div class="job-grid" id="jobs"><div class="loading">Loading job grid…</div></div>
-      <div class="control-panel">
-        <div class="control-label" style="margin-bottom: 8px;">Demo control panel</div>
-        <div class="control-row">
-          <select id="inject-select"><option>Loading jobs…</option></select>
-          <div class="stream-picker" role="radiogroup" aria-label="Stream to spike">
-            <label><input type="radio" name="stream" value="cg" checked /> Consumer Group Lag</label>
-            <label><input type="radio" name="stream" value="topic" /> CG / Topic Lag</label>
-          </div>
-          <button class="primary" id="inject-btn">Inject Spike</button>
-          <button class="secondary" id="clear-btn">Clear Spike</button>
-        </div>
-        <div class="control-help">
-          <b>Inject Spike</b> pushes the selected job\'s chosen stream above the 4M threshold for 120 s — card flips red, Slack alert fires within 5 s.
-          <b>Clear Spike</b> cancels the injection and lets the lag fall back to its natural level.
-        </div>
-      </div>
-    </div>
-
+  <div class="env-grid" id="env-grid">
+    <div class="loading">Loading panels…</div>
   </div>
 
-  <div class="panel" style="height: fit-content; max-height: calc(100vh - 200px); display: flex; flex-direction: column;">
-    <div class="panel-header">
-      <div class="panel-title">Live alert feed</div>
-      <div class="panel-meta" id="feed-count">0 alerts</div>
+  <div class="panel-right">
+    <div class="panel-right-head">
+      <div class="panel-right-title">Live alert feed</div>
+      <div class="panel-right-meta" id="feed-count">0 alerts</div>
     </div>
-    <div class="feed" id="feed"><div class="empty">No alerts yet — system is monitoring.</div></div>
+    <div class="feed" id="feed"><div class="empty-state">No alerts yet — system is monitoring.</div></div>
   </div>
 </div>
 
-<div class="modal-wrap" id="modal">
-  <div class="modal">
-    <div class="modal-head">
-      <h2 id="modal-title">topic</h2>
-      <button class="modal-close" id="modal-close">×</button>
-    </div>
-    <div class="modal-body" id="modal-body">
-      <div class="loading">Loading…</div>
-    </div>
-  </div>
-</div>
-
-<!-- =====================================================================
-     AI Assistant — slide-in panel + floating toggle button
-     ===================================================================== -->
 <button class="ai-fab" id="ai-fab" title="Ask the assistant" aria-label="Open AI assistant">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M12 2 L13.5 7.5 L19 9 L13.5 10.5 L12 16 L10.5 10.5 L5 9 L10.5 7.5 Z" />
@@ -775,16 +595,15 @@
 
   <div class="ai-msgs" id="ai-msgs">
     <div class="ai-msg system">
-      Ask anything about your Kafka jobs — current status, recent breaches,
-      team comparisons, or postmortems. The assistant pulls live data from
-      this monitor; it doesn't see anything else.
+      Ask anything about your Kafka jobs — current status, recent breaches, team
+      comparisons, or postmortems. The assistant pulls live data from this monitor.
     </div>
   </div>
 
   <div class="ai-suggest" id="ai-suggest">
     <button data-q="What's broken right now?">What's broken right now?</button>
-    <button data-q="How is Catalog Team doing this week?">Catalog this week</button>
-    <button data-q="Compare PNO Team breaches today vs yesterday">PNO today vs yesterday</button>
+    <button data-q="How is the PNO team doing this week?">PNO this week</button>
+    <button data-q="Generate a postmortem for the most recent breach.">Recent postmortem</button>
     <button data-q="List every job you monitor">What do you monitor?</button>
   </div>
 
@@ -800,275 +619,6 @@
 // =============================================================================
 // State + utilities
 // =============================================================================
-const FMT_MS = (n) => (n / 1_000_000).toFixed(2);
-const THRESHOLD = 4_000_000;
-
-let _seenAlertIds = new Set();
-let _statusJobs = [];
-
-async function api(path, opts) {
-  const res = await fetch(path, opts);
-  if (!res.ok) throw new Error(`${path} -> ${res.status}`);
-  return res.json();
-}
-
-function formatClock(d = new Date()) {
-  const pad = n => String(n).padStart(2, '0');
-  return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`;
-}
-function relTime(iso) {
-  if (!iso) return '--';
-  const t = new Date(iso).getTime();
-  const s = Math.max(0, Math.round((Date.now() - t) / 1000));
-  if (s < 60) return `${s}s ago`;
-  if (s < 3600) return `${Math.floor(s/60)}m ${s%60}s ago`;
-  return `${Math.floor(s/3600)}h ago`;
-}
-function shortTime(iso) {
-  if (!iso) return "—";
-  return _fmtClockISTSec(new Date(iso));
-}
-
-// =============================================================================
-// Sparkline
-// =============================================================================
-function renderSparkline(el, values, breach) {
-  if (!values || values.length < 2) {
-    el.innerHTML = '<text x="4" y="22" fill="#6e7681" font-size="10" font-family="JetBrains Mono, monospace">no data yet</text>';
-    return;
-  }
-  const W = el.clientWidth || 250;
-  const H = 42;
-  el.setAttribute('viewBox', `0 0 ${W} ${H}`);
-
-  const ymax = Math.max(THRESHOLD * 1.15, ...values);
-  const ymin = 0;
-  const xstep = W / (values.length - 1);
-
-  const pts = values.map((v, i) => {
-    const x = i * xstep;
-    const y = H - ((v - ymin) / (ymax - ymin)) * H;
-    return [x, y];
-  });
-
-  const path = pts.map((p, i) => (i === 0 ? `M${p[0].toFixed(1)},${p[1].toFixed(1)}` : `L${p[0].toFixed(1)},${p[1].toFixed(1)}`)).join('');
-  const fillPath = `${path} L${W},${H} L0,${H} Z`;
-
-  // threshold line
-  const thY = H - (THRESHOLD / ymax) * H;
-  const stroke = breach ? '#f85149' : '#58a6ff';
-  const fill = breach ? '#f8514922' : '#58a6ff22';
-
-  el.innerHTML = `
-    <path d="${fillPath}" fill="${fill}" />
-    <path d="${path}" fill="none" stroke="${stroke}" stroke-width="1.6" stroke-linejoin="round" />
-    <line x1="0" y1="${thY.toFixed(1)}" x2="${W}" y2="${thY.toFixed(1)}" stroke="#f0883e" stroke-width="1" stroke-dasharray="3,3" opacity="0.7" />
-  `;
-}
-
-// =============================================================================
-// Status / job grid
-// =============================================================================
-async function refreshStatus() {
-  try {
-    const data = await api('/api/status');
-    _statusJobs = data.jobs;
-    renderStats(data.summary);
-    renderJobs(data.jobs);
-    renderInjectSelect(data.jobs);
-    if (data.summary.last_poll_at) {
-      // Polled every 5 s; this just confirms the data is fresh.
-      document.getElementById('last-poll').textContent =
-        `Last update: ${relTime(data.summary.last_poll_at)}`;
-    }
-    updateSlackIndicator(data.summary.slack_configured);
-  } catch (e) {
-    console.error(e);
-  }
-}
-
-function updateSlackIndicator(on) {
-  const el = document.getElementById('slack-status');
-  if (on) {
-    el.innerHTML = `<span class="dot slack-on"></span><span>Slack configured</span>`;
-  } else {
-    el.innerHTML = `<span class="dot"></span><span>Slack: in-app only</span>`;
-  }
-}
-
-function renderStats(s) {
-  document.getElementById('stat-monitored').textContent = s.monitored;
-  document.getElementById('stat-breaching').textContent = s.breaching;
-  document.getElementById('stat-healthy').textContent = s.healthy;
-  document.getElementById('stat-alerts').textContent = s.alerts_24h;
-}
-
-// Fixed team display order — keeps the dashboard layout stable across
-// reloads regardless of how /api/status sorts the underlying jobs.
-const TEAM_ORDER = ['PNO Team', 'Catalog Team', 'Shipping Team'];
-
-function _buildJobCard(j) {
-  const card = document.createElement('div');
-  card.className = `card ${j.status === 'breach' ? 'breach' : ''}`;
-  card.dataset.jobId = j.job_id;
-  const envClass = j.environment === 'eus' ? 'eus' : 'scus';
-  card.innerHTML = `
-    <div class="card-top">
-      <div class="topic">${j.topic}</div>
-      <div class="env-tag ${envClass}">${j.environment.toUpperCase()}</div>
-    </div>
-    <div class="meta">
-      <span>${j.team}</span>
-      <span class="meta-sep">·</span>
-      <span class="channel">${j.channel}</span>
-    </div>
-    <svg class="spark" preserveAspectRatio="none"></svg>
-    <div class="card-bottom">
-      <div>
-        <span class="lag-value">${FMT_MS(j.lag)}</span><span class="lag-unit">M msgs</span>
-      </div>
-      <div>
-        <span class="badge ${j.status === 'breach' ? 'breach' : ''}">${j.status === 'breach' ? 'BREACH' : 'HEALTHY'}</span>
-        ${j.injecting ? `<span class="badge injecting">INJECTED${j.injecting_stream === 'topic' ? ' (TOPIC)' : ' (CG)'}</span>` : ''}
-      </div>
-    </div>
-  `;
-  card.addEventListener('click', () => openJobModal(j.job_id));
-  requestAnimationFrame(() => {
-    const svg = card.querySelector('.spark');
-    renderSparkline(svg, j.sparkline, j.status === 'breach');
-  });
-  return card;
-}
-
-function renderJobs(jobs) {
-  const root = document.getElementById('jobs');
-  root.innerHTML = '';
-
-  // Group by team. Within a team, breaching cards float to the top, then
-  // alphabetical by topic, then env (EUS before SCUS) — same intra-team
-  // ordering the previous flat layout used.
-  const byTeam = new Map();
-  for (const j of jobs) {
-    if (!byTeam.has(j.team)) byTeam.set(j.team, []);
-    byTeam.get(j.team).push(j);
-  }
-  for (const arr of byTeam.values()) {
-    arr.sort((a, b) =>
-      (a.status === 'breach' ? 0 : 1) - (b.status === 'breach' ? 0 : 1) ||
-      a.topic.localeCompare(b.topic) ||
-      a.environment.localeCompare(b.environment)
-    );
-  }
-
-  // Render in fixed team order, with any unrecognized teams appended at end.
-  const seen = new Set();
-  const order = [...TEAM_ORDER, ...[...byTeam.keys()].filter(t => !TEAM_ORDER.includes(t))];
-  for (const team of order) {
-    const arr = byTeam.get(team);
-    if (!arr || !arr.length) continue;
-    seen.add(team);
-    const channel = arr[0].channel;
-    const breaching = arr.filter(j => j.status === 'breach').length;
-    const healthy = arr.length - breaching;
-
-    const section = document.createElement('div');
-    section.className = 'team-section';
-    section.dataset.team = team;
-    section.innerHTML = `
-      <div class="team-section-header">
-        <div class="team-section-title">
-          <h3>${team}</h3>
-          <span class="team-channel-tag">${channel}</span>
-        </div>
-        <div class="team-section-stats">
-          <span class="pill ${breaching > 0 ? 'breach' : 'zero'}">${breaching} BREACHING</span>
-          <span class="pill ${healthy > 0 ? 'healthy' : 'zero'}">${healthy} HEALTHY</span>
-          <span>· ${arr.length} job${arr.length === 1 ? '' : 's'}</span>
-        </div>
-      </div>
-      <div class="team-section-grid"></div>
-    `;
-    const grid = section.querySelector('.team-section-grid');
-    for (const j of arr) grid.appendChild(_buildJobCard(j));
-    root.appendChild(section);
-  }
-}
-
-function renderInjectSelect(jobs) {
-  const sel = document.getElementById('inject-select');
-  const prev = sel.value;
-  sel.innerHTML = '';
-  for (const j of jobs) {
-    const opt = document.createElement('option');
-    opt.value = j.job_id;
-    opt.textContent = `${j.topic} :: ${j.environment.toUpperCase()}`;
-    sel.appendChild(opt);
-  }
-  if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
-}
-
-// =============================================================================
-// Alert feed
-// =============================================================================
-async function refreshAlerts() {
-  try {
-    const data = await api('/api/alerts?limit=80');
-    renderFeed(data.alerts);
-  } catch (e) { console.error(e); }
-}
-
-function renderFeed(alerts) {
-  const feed = document.getElementById('feed');
-  document.getElementById('feed-count').textContent = `${alerts.length} alert${alerts.length === 1 ? '' : 's'}`;
-  if (!alerts.length) {
-    feed.innerHTML = '<div class="empty">No alerts yet — system is monitoring.</div>';
-    return;
-  }
-  feed.innerHTML = '';
-  for (const a of alerts) {
-    const isNew = !_seenAlertIds.has(a.id);
-    _seenAlertIds.add(a.id);
-    const div = document.createElement('div');
-    div.className = `alert ${a.alert_type === 'resolved' ? 'resolved' : ''}`;
-    if (!isNew) div.style.animation = 'none';
-    const isBreach = a.alert_type === 'breach';
-    const reminderTag = isBreach && a.reminder_count
-      ? ` <span style="color:var(--orange);font-size:9px;font-weight:700;letter-spacing:0.4px;">· REMINDER #${a.reminder_count}</span>`
-      : '';
-    const ackTag = a.acknowledged_at
-      ? ` <span style="color:var(--green);font-size:9px;font-weight:700;letter-spacing:0.4px;">· ACK'D</span>`
-      : '';
-    const lagOver = isBreach ? 'over' : '';
-    div.innerHTML = `
-      <div class="alert-head">
-        <div class="alert-type">${isBreach ? '▲ BREACH' : '✓ RESOLVED'}${reminderTag}${ackTag}</div>
-        <div class="alert-time">${shortTime(a.created_at)}</div>
-      </div>
-      <div class="alert-topic">${a.topic}</div>
-      <div class="alert-meta">
-        <span>${a.environment.toUpperCase()}</span>
-        <span>·</span>
-        <span class="lag ${lagOver}">${FMT_MS(a.lag_value)}M</span>
-        <span class="threshold-mini">/ ${FMT_MS(a.threshold)}M</span>
-        <span style="margin-left:auto;color:var(--text-mute);">${a.team}</span>
-        ${a.delivered_to_slack ? '<span class="delivered">✓ DELIVERED</span>' : ''}
-      </div>
-    `;
-    div.title = 'Click to open this job\'s graph at the moment of the alert';
-    div.addEventListener('click', () => openJobModal(a.job_id, a.created_at));
-    feed.appendChild(div);
-  }
-}
-
-
-// =============================================================================
-// Modal — full graphs (Consumer Group / Topic Lag + Consumer Group Lag)
-// =============================================================================
-// Time-range presets. Backed by the SQLite lag_history table — the longer
-// ranges only have data once the monitor has been running long enough to
-// collect it. Bucketing is done server-side; the dashboard never sees more
-// than ~720 points regardless of which range is selected.
 const RANGE_PRESETS = [
   { key: '30m', label: '30m', minutes: 30 },
   { key: '6h',  label: '6h',  minutes: 360 },
@@ -1080,179 +630,293 @@ const RANGE_PRESETS = [
   { key: '3mo', label: '3mo', minutes: 129600 },
   { key: '6mo', label: '6mo', minutes: 259200 },
 ];
-function _presetForMinutes(minutes) {
-  // pick the smallest preset >= minutes (so the alert is in-frame)
-  for (const p of RANGE_PRESETS) if (p.minutes >= minutes) return p;
-  return RANGE_PRESETS[RANGE_PRESETS.length - 1];
+
+const STATE = {
+  topics: [],          // [{topic, consumer_group, team, channel}]
+  environments: [],    // ['eus', 'scus']
+  panels: [],          // panel definitions from /api/panels
+  selected_topic: null,
+  range_minutes: 720,  // default 12h to match Grafana
+  poll_handle: null,
+  seen_alert_ids: new Set(),
+};
+
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  if (!res.ok) throw new Error(`${path} -> ${res.status}`);
+  return res.json();
 }
 
-async function openJobModal(jobId, alertTs = null) {
-  const wrap = document.getElementById('modal');
-  const body = document.getElementById('modal-body');
-  document.getElementById('modal-title').textContent = jobId;
-  // If we were called from an alert that's older than 30 min, expand the
-  // default range so the event is in the visible window.
-  let defaultPreset = RANGE_PRESETS[0];
-  let alertTsMs = null;
-  if (alertTs) {
-    alertTsMs = new Date(alertTs).getTime();
-    const ageMin = (Date.now() - alertTsMs) / 60000;
-    if (ageMin > 0) defaultPreset = _presetForMinutes(Math.ceil(ageMin * 1.2));
-  }
-  body.innerHTML = `<div class="loading">Loading ${defaultPreset.label} history…</div>`;
-  wrap.classList.add('open');
-  // remember the job + alert ts on the modal so range buttons can reload
-  wrap.dataset.jobId = jobId;
-  wrap.dataset.alertTs = alertTs || '';
+const FMT_K = (n) => {
+  if (n === null || n === undefined || isNaN(n)) return '0';
+  const abs = Math.abs(n);
+  if (abs >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+  if (abs >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+  if (abs >= 1e3) return (n / 1e3).toFixed(2) + 'K';
+  if (abs < 1 && abs > 0) return n.toFixed(2);
+  return Math.round(n).toString();
+};
 
-  try {
-    body.innerHTML = renderModalBody(jobId, defaultPreset.key);
-    // load both graphs (independent fetches so the user can change either
-    // range later without affecting the other)
-    await Promise.all([
-      loadGraph(jobId, 'cg_lag',    'Consumer Group Lag',         defaultPreset.minutes, alertTsMs, 'cg'),
-      loadGraph(jobId, 'topic_lag', 'Consumer Group / Topic Lag', defaultPreset.minutes, alertTsMs, 'topic'),
-    ]);
-    // Live updates while the modal is open — re-fetch both graphs every
-    // 5 s using whichever range is currently active. Cleared on close.
-    _startModalRefresh();
-  } catch (e) {
-    body.innerHTML = `<div class="empty">Failed to load: ${e.message}</div>`;
-  }
+// IST = UTC + 5:30
+const IST_OFFSET_MIN = 330;
+function _toIST(d) { return new Date(d.getTime() + IST_OFFSET_MIN * 60000); }
+function fmtClockIST(d) {
+  const i = _toIST(d);
+  return String(i.getUTCHours()).padStart(2,'0') + ':' + String(i.getUTCMinutes()).padStart(2,'0');
+}
+function fmtFullIST(d) {
+  const i = _toIST(d);
+  const date = i.getUTCFullYear() + '-' + String(i.getUTCMonth()+1).padStart(2,'0') + '-' + String(i.getUTCDate()).padStart(2,'0');
+  return date + ' ' + fmtClockIST(d) + ':' + String(i.getUTCSeconds()).padStart(2,'0');
+}
+function relTime(iso) {
+  const d = new Date(iso);
+  const s = Math.floor((Date.now() - d.getTime()) / 1000);
+  if (s < 5)    return 'just now';
+  if (s < 60)   return s + 's ago';
+  if (s < 3600) return Math.floor(s/60) + 'm ago';
+  return Math.floor(s/3600) + 'h ago';
 }
 
-// Load + draw a single graph. Stores the latest result on the SVG so the
-// hover handler / re-render can pick it up.
-async function loadGraph(jobId, valueKey, label, minutes, alertTsMs, slot) {
-  const svg = document.getElementById('graph-' + slot);
-  const meta = document.getElementById('meta-' + slot);
-  if (!svg) return;
-  svg.innerHTML = `<text x="14" y="40" fill="#6e7681" font-size="11" font-family="JetBrains Mono,monospace">Loading…</text>`;
-  try {
-    const data = await api(`/api/job/${encodeURIComponent(jobId)}/history?minutes=${minutes}`);
-    if (meta) {
-      // Show the current per-graph lag value next to the graph name so
-      // each stream's number is unmistakable (the in-chart pinned label
-      // is easy to overlook).
-      const last = data.history.length ? data.history[data.history.length - 1] : null;
-      const curVal = last ? (last[valueKey] || 0) : 0;
-      const breach = curVal >= (data.threshold || 4_000_000);
-      const color = breach ? 'var(--red)' : 'var(--text)';
-      meta.innerHTML =
-        `<span class="mono" style="color:${color};font-weight:600;">` +
-        `current ${(curVal / 1_000_000).toFixed(2)}M` +
-        `</span>`;
+// =============================================================================
+// Range buttons
+// =============================================================================
+function renderRangeButtons() {
+  const root = document.getElementById('range-group');
+  root.innerHTML = RANGE_PRESETS.map(p =>
+    `<button class="range-btn${p.minutes === STATE.range_minutes ? ' active' : ''}" data-minutes="${p.minutes}">${p.label}</button>`
+  ).join('');
+  root.querySelectorAll('.range-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      STATE.range_minutes = parseInt(b.dataset.minutes, 10);
+      renderRangeButtons();
+      reloadAllPanels();
+    });
+  });
+}
+
+// =============================================================================
+// Topic dropdown
+// =============================================================================
+function renderTopicDropdown() {
+  const sel = document.getElementById('topic-select');
+  if (!STATE.topics.length) {
+    sel.innerHTML = '<option>(no topics in catalog)</option>';
+    sel.disabled = true;
+    return;
+  }
+  const prev = STATE.selected_topic && STATE.selected_topic.topic;
+  sel.innerHTML = STATE.topics.map((t, i) =>
+    `<option value="${i}" ${t.topic === prev ? 'selected' : ''}>${t.topic} · ${t.consumer_group}</option>`
+  ).join('');
+  sel.disabled = false;
+  sel.onchange = () => {
+    const idx = parseInt(sel.value, 10);
+    STATE.selected_topic = STATE.topics[idx];
+    reloadAllPanels();
+  };
+  if (!STATE.selected_topic) STATE.selected_topic = STATE.topics[0];
+}
+
+// =============================================================================
+// Env grid + panel rendering
+// =============================================================================
+function renderEnvGrid() {
+  const root = document.getElementById('env-grid');
+  if (!STATE.environments.length || !STATE.panels.length) {
+    root.innerHTML = `<div class="loading">No data source configured.</div>`;
+    return;
+  }
+
+  // Group panels by section, preserve definition order
+  const sections = {};
+  for (const p of STATE.panels) {
+    if (!sections[p.section]) sections[p.section] = [];
+    sections[p.section].push(p);
+  }
+
+  let html = '';
+  for (const env of STATE.environments) {
+    const envUp = env.toUpperCase();
+    let sectionsHtml = '';
+    for (const sectionId of Object.keys(sections)) {
+      const sectionTitle = sectionId.replace(/_/g, ' ').toUpperCase();
+      let panelsHtml = '';
+      for (const p of sections[sectionId]) {
+        const slotId = `panel-${env}-${p.id}`;
+        panelsHtml += `
+          <div class="panel" id="${slotId}">
+            <div class="panel-head">
+              <div class="panel-title">${p.title}</div>
+              <div class="panel-stats" id="${slotId}-stats">--</div>
+            </div>
+            <div class="panel-loading">Loading…</div>
+            <div class="panel-legend">
+              <span class="swatch" style="background:${p.color}"></span>
+              <span>${p.title}</span>
+            </div>
+          </div>
+        `;
+      }
+      sectionsHtml += `
+        <div class="section-head">${sectionTitle}</div>
+        ${panelsHtml}
+      `;
     }
-    drawGraph(svg, data.history, data.threshold, valueKey, label, minutes, alertTsMs);
-  } catch (e) {
-    svg.innerHTML = `<text x="14" y="40" fill="#f85149" font-size="11" font-family="JetBrains Mono,monospace">Failed: ${e.message}</text>`;
+    html += `
+      <div class="env-block" data-env="${env}">
+        <div class="env-head">
+          <div class="env-name"><span class="env-dot"></span>Environment: ${envUp}</div>
+          <div class="env-meta" id="env-meta-${env}">--</div>
+        </div>
+        ${sectionsHtml}
+      </div>
+    `;
+  }
+  root.innerHTML = html;
+}
+
+async function reloadAllPanels() {
+  if (!STATE.selected_topic) return;
+  const minutes = STATE.range_minutes;
+  for (const env of STATE.environments) {
+    for (const p of STATE.panels) {
+      loadPanel(p, env, minutes).catch(err => {
+        console.error('panel load failed', p.id, env, err);
+      });
+    }
   }
 }
 
+async function loadPanel(panel, env, minutes) {
+  const slot = document.getElementById(`panel-${env}-${panel.id}`);
+  if (!slot) return;
+  const statsEl = document.getElementById(`panel-${env}-${panel.id}-stats`);
 
-function _buildRangeBar(slot, activeKey) {
-  return `<div class="range-group" data-slot="${slot}" role="tablist">
-    ${RANGE_PRESETS.map(p =>
-      `<button class="range-btn${p.key === activeKey ? ' active' : ''}" data-key="${p.key}" data-minutes="${p.minutes}">${p.label}</button>`
-    ).join('')}
-  </div>`;
+  const params = new URLSearchParams();
+  params.set('minutes', minutes);
+  if (panel.scope.includes('env')) params.set('env', env);
+  if (panel.scope.includes('topic')) params.set('topic', STATE.selected_topic.topic);
+  if (panel.scope.includes('consumer_group')) params.set('consumer_group', STATE.selected_topic.consumer_group);
+
+  // Replace the inner content with a loading placeholder while we fetch
+  const placeholder = slot.querySelector('.panel-loading, .panel-svg, .panel-empty, .panel-error');
+  if (placeholder) placeholder.outerHTML = `<div class="panel-loading">Loading…</div>`;
+
+  let data;
+  try {
+    data = await api(`/api/panel/${panel.id}/range?${params.toString()}`);
+  } catch (e) {
+    const ph = slot.querySelector('.panel-loading, .panel-svg, .panel-empty');
+    if (ph) ph.outerHTML = `<div class="panel-empty">Error: ${e.message}</div>`;
+    if (statsEl) statsEl.textContent = '--';
+    return;
+  }
+
+  const points = data.points || [];
+
+  // Update stats line (Mean · Last · Max · Min)
+  if (statsEl) {
+    if (!points.length) {
+      statsEl.innerHTML = '<span style="color:var(--text-mute)">No data</span>';
+    } else {
+      const values = points.map(p => p.value);
+      const mean = values.reduce((a,b) => a+b, 0) / values.length;
+      const last = values[values.length - 1];
+      const max = Math.max(...values);
+      const min = Math.min(...values);
+      statsEl.innerHTML = `Mean <b>${FMT_K(mean)}</b> · Last <b>${FMT_K(last)}</b> · Max <b>${FMT_K(max)}</b> · Min <b>${FMT_K(min)}</b>`;
+    }
+  }
+
+  // Render chart
+  const ph2 = slot.querySelector('.panel-loading, .panel-svg, .panel-empty');
+  if (!points.length) {
+    if (ph2) ph2.outerHTML = `<div class="panel-empty">No data for this range</div>`;
+    return;
+  }
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.classList.add('panel-svg');
+  svg.setAttribute('preserveAspectRatio', 'none');
+  if (ph2) ph2.replaceWith(svg);
+  drawChart(svg, points, panel);
 }
 
-function renderModalBody(jobId, activePresetKey) {
-  // Status from the cached /api/status payload — gives us the meta strip
-  // values without waiting for history to load.
-  const cached = (_statusJobs || []).find(j => j.job_id === jobId) || {};
-  const team    = cached.team    || '';
-  const channel = cached.channel || '';
-  const cg      = cached.consumer_group || '';
-  const env     = (cached.environment || '').toUpperCase();
-  const lag     = cached.lag || 0;
-  const breach  = (cached.status === 'breach');
-  const threshold = 4_000_000;
+// =============================================================================
+// Grafana-style spike chart
+// =============================================================================
+function drawChart(svg, points, panel) {
+  const W = 800, H = 130, padL = 50, padR = 8, padT = 6, padB = 22;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.innerHTML = '';
 
-  return `
-    <div class="modal-meta">
-      <span><b>${team}</b> · ${channel}</span>
-      <span>·</span>
-      <span>Consumer group: <b class="mono">${cg}</b></span>
-      <span>·</span>
-      <span>Environment: <b>${env}</b></span>
-      <span>·</span>
-      <span>Threshold: <b>${FMT_MS(threshold)}M</b></span>
-      <span>·</span>
-      <span>Current lag (max of both): <b class="mono" style="color:${breach ? 'var(--breach)' : 'var(--healthy)'}">${FMT_MS(lag)}M</b></span>
-    </div>
-    <div class="graph-block">
-      <div class="graph-title-row">
-        <div class="graph-title">Consumer Group Lag <span id="meta-cg" style="color:var(--text-mute);font-size:11px;font-weight:500;margin-left:8px;"></span></div>
-        ${_buildRangeBar('cg', activePresetKey)}
-      </div>
-      <svg class="graph-svg" id="graph-cg" preserveAspectRatio="none"></svg>
-    </div>
-    <div class="graph-block">
-      <div class="graph-title-row">
-        <div class="graph-title">Consumer Group / Topic Lag <span id="meta-topic" style="color:var(--text-mute);font-size:11px;font-weight:500;margin-left:8px;"></span></div>
-        ${_buildRangeBar('topic', activePresetKey)}
-      </div>
-      <svg class="graph-svg" id="graph-topic" preserveAspectRatio="none"></svg>
-    </div>
+  const tsArr = points.map(p => p.ts);
+  const valArr = points.map(p => p.value);
+  const tMin = tsArr[0], tMax = tsArr[tsArr.length - 1];
+  const tSpan = Math.max(1, tMax - tMin);
+  let dataMax = Math.max(...valArr);
+  let dataMin = Math.min(...valArr);
+  if (panel.y_min !== null && panel.y_min !== undefined) dataMin = Math.min(dataMin, panel.y_min);
+  if (panel.y_max !== null && panel.y_max !== undefined) dataMax = Math.max(dataMax, panel.y_max);
+  if (dataMax === dataMin) dataMax = dataMin + 1;
+  const yMin = panel.y_min !== null && panel.y_min !== undefined ? panel.y_min : Math.max(0, dataMin);
+  const yMax = panel.y_max !== null && panel.y_max !== undefined ? panel.y_max : dataMax * 1.1;
+  const yRange = Math.max(0.0001, yMax - yMin);
+
+  const innerW = W - padL - padR;
+  const innerH = H - padT - padB;
+  const xOf = (t) => padL + ((t - tMin) / tSpan) * innerW;
+  const yOf = (v) => padT + (1 - (v - yMin) / yRange) * innerH;
+
+  // y-axis ticks (5)
+  const niceStep = _niceStep(yRange);
+  const ticks = [];
+  for (let v = Math.ceil(yMin / niceStep) * niceStep; v <= yMax + 0.0001; v += niceStep) {
+    ticks.push(v);
+  }
+  let yAxis = '';
+  for (const v of ticks) {
+    const y = yOf(v);
+    yAxis += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${padL+innerW}" y2="${y.toFixed(1)}" stroke="#1a1f27" stroke-width="0.5" />`;
+    yAxis += `<text x="${padL-6}" y="${(y+3.5).toFixed(1)}" fill="#8b949e" font-size="9.5" font-family="JetBrains Mono,monospace" text-anchor="end">${FMT_K(v)}</text>`;
+  }
+
+  // x-axis ticks (~6)
+  const xTickCount = Math.min(8, Math.max(3, Math.floor(innerW / 110)));
+  let xAxis = '';
+  for (let i = 0; i <= xTickCount; i++) {
+    const t = tMin + (tSpan * i / xTickCount);
+    const x = xOf(t);
+    xAxis += `<line x1="${x.toFixed(1)}" y1="${padT}" x2="${x.toFixed(1)}" y2="${padT+innerH}" stroke="#1a1f27" stroke-width="0.5" />`;
+    const d = new Date(t * 1000);
+    xAxis += `<text x="${x.toFixed(1)}" y="${(padT+innerH+13).toFixed(1)}" fill="#8b949e" font-size="9.5" font-family="JetBrains Mono,monospace" text-anchor="middle">${fmtClockIST(d)}</text>`;
+  }
+
+  // Spike-style line: vertical line for each point from baseline
+  const baseline = yOf(yMin);
+  let spikes = '';
+  for (let i = 0; i < points.length; i++) {
+    const x = xOf(tsArr[i]);
+    const y = yOf(valArr[i]);
+    spikes += `<line x1="${x.toFixed(1)}" y1="${baseline.toFixed(1)}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${panel.color}" stroke-width="1" />`;
+  }
+
+  // Connect-the-dots line on top (like Grafana when zoomed out)
+  const path = points.map((p, i) =>
+    (i ? 'L' : 'M') + xOf(p.ts).toFixed(1) + ',' + yOf(p.value).toFixed(1)
+  ).join('');
+
+  svg.innerHTML = `
+    ${yAxis}
+    ${xAxis}
+    ${spikes}
+    <path d="${path}" fill="none" stroke="${panel.color}" stroke-width="0.7" opacity="0.6" />
   `;
 }
 
-// Click delegation for the per-graph range buttons. Reload only the graph
-// whose group was clicked.
-document.addEventListener('click', (ev) => {
-  const btn = ev.target.closest && ev.target.closest('.range-btn');
-  if (!btn) return;
-  const group = btn.closest('.range-group');
-  if (!group) return;
-  const slot = group.dataset.slot;
-  const minutes = parseInt(btn.dataset.minutes, 10);
-  group.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  const wrap = document.getElementById('modal');
-  const jobId = wrap.dataset.jobId;
-  const alertTs = wrap.dataset.alertTs;
-  const alertTsMs = alertTs ? new Date(alertTs).getTime() : null;
-  const label = (slot === 'cg') ? 'Consumer Group Lag' : 'Consumer Group / Topic Lag';
-  const valueKey = (slot === 'cg') ? 'cg_lag' : 'topic_lag';
-  loadGraph(jobId, valueKey, label, minutes, alertTsMs, slot);
-});
-
-// All graph & feed time labels render in IST (UTC+05:30, no DST).
-// We compute IST by shifting the UTC instant by 330 minutes — simpler than
-// Intl.DateTimeFormat which can produce locale-dependent punctuation.
-const IST_OFFSET_MIN = 5 * 60 + 30;
-function _toIST(d) { return new Date(d.getTime() + IST_OFFSET_MIN * 60000); }
-function _fmtClockIST(d) {
-  const i = _toIST(d);
-  return String(i.getUTCHours()).padStart(2, '0') + ':' + String(i.getUTCMinutes()).padStart(2, '0');
-}
-function _fmtClockISTSec(d) {
-  const i = _toIST(d);
-  return String(i.getUTCHours()).padStart(2, '0') + ':' + String(i.getUTCMinutes()).padStart(2, '0') + ':' + String(i.getUTCSeconds()).padStart(2, '0');
-}
-function _fmtDateIST(d) {
-  const i = _toIST(d);
-  return String(i.getUTCMonth() + 1).padStart(2, '0') + '/' + String(i.getUTCDate()).padStart(2, '0');
-}
-function _fmtMonthDayIST(d) {
-  const i = _toIST(d);
-  const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return M[i.getUTCMonth()] + ' ' + i.getUTCDate();
-}
-function _fmtFullIST(d) {
-  const i = _toIST(d);
-  const date = i.getUTCFullYear() + '-' + String(i.getUTCMonth() + 1).padStart(2, '0') + '-' + String(i.getUTCDate()).padStart(2, '0');
-  return date + ' ' + _fmtClockISTSec(d);
-}
-// Backwards-compat shims — anything still calling the old names now
-// quietly produces IST labels.
-function _fmtClockUTC(d) { return _fmtClockIST(d); }
-function _fmtClockUTCSec(d) { return _fmtClockISTSec(d); }
-function _niceStep(max, targetTicks = 5) {
-  if (max <= 0) return 1;
-  const raw = max / targetTicks;
+function _niceStep(range, targetTicks = 4) {
+  if (range <= 0) return 1;
+  const raw = range / targetTicks;
   const exp = Math.pow(10, Math.floor(Math.log10(raw)));
   const norm = raw / exp;
   let mul;
@@ -1263,389 +927,72 @@ function _niceStep(max, targetTicks = 5) {
   return mul * exp;
 }
 
-// Render a full graph with time x-axis, lag-amount y-axis (in millions),
-// threshold line, current-value pin, and a hover crosshair + tooltip.
-function drawGraph(svg, history, threshold, valueKey, label, rangeMinutes = 30, alertTsMs = null) {
-  if (!svg) return;
-  if (!history || !history.length) {
-    svg.innerHTML = '<text x="14" y="40" fill="#6e7681" font-size="11" font-family="JetBrains Mono,monospace">No history yet — wait for first poll.</text>';
-    return;
-  }
-  const W = svg.clientWidth || 800;
-  const H = 240;
-  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
-  svg.style.height = H + 'px';
-  const padL = 64, padR = 18, padT = 18, padB = 38;
-  const innerW = W - padL - padR;
-  const innerH = H - padT - padB;
-
-  const tsArr = history.map(h => new Date(h.ts).getTime());
-  const valArr = history.map(h => h[valueKey] ?? 0);
-  const tMin = tsArr[0], tMax = tsArr[tsArr.length - 1];
-  const tSpan = Math.max(1, tMax - tMin);
-  const dataMax = Math.max(...valArr, threshold);
-  // Tick step: halved so the labelled axis shows 0.5M-style increments
-  // instead of the default 1M-style. ymax is rounded to the nearest step
-  // multiple so the top of the chart aligns with a tick label.
-  const step = _niceStep(Math.max(threshold * 1.25, dataMax * 1.1)) / 2;
-  const ymax = Math.ceil(Math.max(threshold * 1.25, dataMax * 1.1) / step) * step;
-
-  const lastVal = valArr[valArr.length - 1];
-  const breach = lastVal >= threshold;
-
-  // ---- color tokens (split coloring on threshold) ------------------------
-  const COLOR_OK   = '#58a6ff';       // blue  — below threshold
-  const COLOR_HOT  = '#f85149';       // red   — above threshold
-  const uid = Math.random().toString(36).slice(2, 9);
-
-  const xOf = (t) => padL + ((t - tMin) / tSpan) * innerW;
-  const yOf = (v) => padT + innerH - (Math.min(v, ymax) / ymax) * innerH;
-
-  const pts = history.map((h, i) => [xOf(tsArr[i]), yOf(valArr[i])]);
-  const path = pts.map((p, i) => (i ? `L${p[0].toFixed(1)},${p[1].toFixed(1)}` : `M${p[0].toFixed(1)},${p[1].toFixed(1)}`)).join('');
-  const fill = `${path} L${(padL + innerW).toFixed(1)},${(padT + innerH).toFixed(1)} L${padL.toFixed(1)},${(padT + innerH).toFixed(1)} Z`;
-
-  // y-axis ticks (gridline + label per `step`) ----------------------------
-  let yAxis = '';
-  for (let v = 0; v <= ymax + 1; v += step) {
-    const y = yOf(v);
-    const isThresholdNear = Math.abs(v - threshold) < step / 4;
-    yAxis += `\n      <line x1="${padL}" y1="${y.toFixed(1)}" x2="${padL + innerW}" y2="${y.toFixed(1)}" stroke="#262e39" stroke-width="0.7" stroke-dasharray="2,4" />`;
-    if (!isThresholdNear) {
-      yAxis += `\n      <text x="${padL - 8}" y="${(y + 3.5).toFixed(1)}" fill="#8b949e" font-size="10.5" font-family="JetBrains Mono, monospace" text-anchor="end">${(v / 1_000_000).toFixed(1)}M</text>`;
-    }
-  }
-  yAxis += `\n      <text x="${padL - 52}" y="${(padT + innerH / 2).toFixed(1)}" fill="#8b949e" font-size="10" font-family="Manrope, sans-serif" transform="rotate(-90 ${padL - 52} ${(padT + innerH / 2).toFixed(1)})" text-anchor="middle">Lag</text>`;
-
-  // x-axis (range-aware) ---------------------------------------------------
-  const fmtTick = (d) => {
-    if (rangeMinutes <= 360)   return _fmtClockIST(d);
-    if (rangeMinutes <= 1440)  return _fmtClockIST(d);
-    if (rangeMinutes <= 10080) return `${_fmtDateIST(d)} ${_fmtClockIST(d)}`;
-    if (rangeMinutes <= 43200) return _fmtDateIST(d);
-    return _fmtMonthDayIST(d);
-  };
-  const NTICKS = (rangeMinutes <= 360 ? 6 : rangeMinutes <= 1440 ? 6 : rangeMinutes <= 10080 ? 7 : rangeMinutes <= 43200 ? 6 : 6);
-  let xAxis = '';
-  for (let i = 0; i <= NTICKS; i++) {
-    const t = tMin + (tSpan * i) / NTICKS;
-    const x = xOf(t);
-    const dt = new Date(t);
-    xAxis += `\n      <line x1="${x.toFixed(1)}" y1="${padT}" x2="${x.toFixed(1)}" y2="${(padT + innerH).toFixed(1)}" stroke="#1a1f27" stroke-width="0.5" />`;
-    xAxis += `\n      <line x1="${x.toFixed(1)}" y1="${(padT + innerH).toFixed(1)}" x2="${x.toFixed(1)}" y2="${(padT + innerH + 4).toFixed(1)}" stroke="#3a434f" stroke-width="0.8" />`;
-    xAxis += `\n      <text x="${x.toFixed(1)}" y="${(padT + innerH + 16).toFixed(1)}" fill="#8b949e" font-size="10.5" font-family="JetBrains Mono, monospace" text-anchor="middle">${fmtTick(dt)}</text>`;
-  }
-  xAxis += `\n      <text x="${(padL + innerW / 2).toFixed(1)}" y="${(H - 6).toFixed(1)}" fill="#8b949e" font-size="10" font-family="Manrope, sans-serif" text-anchor="middle">Time (IST)</text>`;
-
-  // threshold line ---------------------------------------------------------
-  const thY = yOf(threshold);
-  const threshLine = `
-    <line x1="${padL}" y1="${thY.toFixed(1)}" x2="${padL + innerW}" y2="${thY.toFixed(1)}" stroke="#f0883e" stroke-width="1.4" stroke-dasharray="5,4" />
-    <rect x="${(padL + innerW - 96).toFixed(1)}" y="${(thY - 14).toFixed(1)}" width="92" height="14" fill="#161b22" stroke="#f0883e" stroke-width="0.8" rx="2" />
-    <text x="${(padL + innerW - 6).toFixed(1)}" y="${(thY - 4).toFixed(1)}" fill="#f0883e" font-size="10" font-family="JetBrains Mono, monospace" text-anchor="end">threshold ${(threshold / 1_000_000).toFixed(1)}M</text>
-  `;
-
-  // current-value pin ------------------------------------------------------
-  const lastX = pts[pts.length - 1][0];
-  const lastY = pts[pts.length - 1][1];
-  const lastDt = new Date(tsArr[tsArr.length - 1]);
-  const pinStroke = breach ? COLOR_HOT : COLOR_OK;
-  const pinLabel = `${(lastVal / 1_000_000).toFixed(2)}M @ ${_fmtClockUTC(lastDt)}`;
-  const pinW = pinLabel.length * 6.4 + 14;
-  const labelLeft = (lastX + pinW + 8) > (padL + innerW);
-  const labX = labelLeft ? lastX - pinW - 8 : lastX + 8;
-  const pin = `
-    <circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="3" fill="${pinStroke}" stroke="#0d1117" stroke-width="1.2" />
-    <rect x="${labX.toFixed(1)}" y="${(lastY - 9).toFixed(1)}" width="${pinW.toFixed(1)}" height="18" rx="3" fill="#0d1117" stroke="${pinStroke}" stroke-width="0.7" stroke-opacity="0.65" />
-    <text x="${(labX + pinW / 2).toFixed(1)}" y="${(lastY + 4).toFixed(1)}" fill="${pinStroke}" font-size="10" font-family="JetBrains Mono, monospace" text-anchor="middle" font-weight="600">${pinLabel}</text>
-  `;
-
-  // alert-occurred marker (vertical line + flag) ---------------------------
-  let alertMark = '';
-  if (alertTsMs && alertTsMs >= tMin - 5_000 && alertTsMs <= tMax + 5_000) {
-    const ax = xOf(Math.max(tMin, Math.min(tMax, alertTsMs)));
-    const adt = new Date(alertTsMs);
-    const flagW = 110;
-    const fx = (ax + flagW + 6 > padL + innerW) ? ax - flagW - 6 : ax + 6;
-    alertMark = `
-      <line x1="${ax.toFixed(1)}" y1="${padT}" x2="${ax.toFixed(1)}" y2="${(padT + innerH).toFixed(1)}" stroke="#f85149" stroke-width="0.9" stroke-dasharray="2,3" stroke-opacity="0.85" />
-      <rect x="${fx.toFixed(1)}" y="${(padT + 4).toFixed(1)}" width="${flagW}" height="16" rx="3" fill="#11151a" stroke="#f85149" stroke-width="0.7" stroke-opacity="0.7" />
-      <text x="${(fx + flagW / 2).toFixed(1)}" y="${(padT + 15).toFixed(1)}" fill="#f85149" font-size="9.5" font-family="JetBrains Mono, monospace" text-anchor="middle" font-weight="600" letter-spacing="0.4">ALERT @ ${_fmtClockIST(adt)}</text>
-    `;
-  }
-
-  // ---- crossing detection (BOTH directions) -----------------------------
-  // Upward (below -> at/above):  red ✕  — incident started here.
-  // Downward (above -> below):   green ✓ — system recovered here.
-  // Tooltip on each shows the IST timestamp.
-  const crossings = [];
-  for (let i = 1; i < valArr.length; i++) {
-    const a = valArr[i - 1], b = valArr[i];
-    if (a < threshold && b >= threshold) {
-      const t = (threshold - a) / (b - a || 1);
-      const cx = pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * t;
-      const cTs = tsArr[i - 1] + (tsArr[i] - tsArr[i - 1]) * t;
-      crossings.push({ x: cx, y: thY, ts: cTs, dir: 'up' });
-    } else if (a >= threshold && b < threshold) {
-      const t = (a - threshold) / ((a - b) || 1);
-      const cx = pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * t;
-      const cTs = tsArr[i - 1] + (tsArr[i] - tsArr[i - 1]) * t;
-      crossings.push({ x: cx, y: thY, ts: cTs, dir: 'down' });
-    }
-  }
-  let crossingMarks = '';
-  for (const c of crossings) {
-    const dt = new Date(c.ts);
-    if (c.dir === 'up') {
-      const tip = `Breach @ ${_fmtClockISTSec(dt)} IST`;
-      // A small, bordered upward triangle perched just above the threshold
-      // line — clean and unobtrusive at every zoom level.
-      crossingMarks += `
-        <g class="crossing-mark" transform="translate(${c.x.toFixed(1)} ${c.y.toFixed(1)})">
-          <title>${tip}</title>
-          <circle r="6" fill="${COLOR_HOT}" fill-opacity="0.18" />
-          <polygon points="0,-4.2 3.6,2.2 -3.6,2.2" fill="${COLOR_HOT}" stroke="#0d1117" stroke-width="0.8" />
-        </g>`;
-    } else {
-      const tip = `Recovered @ ${_fmtClockISTSec(dt)} IST`;
-      crossingMarks += `
-        <g class="crossing-mark" transform="translate(${c.x.toFixed(1)} ${c.y.toFixed(1)})">
-          <title>${tip}</title>
-          <circle r="6" fill="#3fb950" fill-opacity="0.18" />
-          <polygon points="0,4.2 3.6,-2.2 -3.6,-2.2" fill="#3fb950" stroke="#0d1117" stroke-width="0.8" />
-        </g>`;
-    }
-  }
-
-  // ---- compose -----------------------------------------------------------
-  // Two clip rects so we can render the same path twice with different colors:
-  //   `clipBlue`  = strip from y=thY..H (below-threshold, lower part of svg)
-  //   `clipRed`   = strip from y=padT..thY (above-threshold, upper part)
-  // Stroke widths nudged slightly so the seam at threshold doesn't shimmer.
-  svg.innerHTML = `
-    <defs>
-      <clipPath id="clipBlue_${uid}"><rect x="${padL}" y="${thY.toFixed(2)}" width="${innerW}" height="${(padT + innerH - thY).toFixed(2)}" /></clipPath>
-      <clipPath id="clipRed_${uid}"><rect x="${padL}" y="${padT}" width="${innerW}" height="${(thY - padT).toFixed(2)}" /></clipPath>
-      <linearGradient id="gradBlue_${uid}" x1="0" x2="0" y1="0" y2="1">
-        <stop offset="0%"   stop-color="${COLOR_OK}" stop-opacity="0.32" />
-        <stop offset="100%" stop-color="${COLOR_OK}" stop-opacity="0.02" />
-      </linearGradient>
-      <linearGradient id="gradRed_${uid}" x1="0" x2="0" y1="0" y2="1">
-        <stop offset="0%"   stop-color="${COLOR_HOT}" stop-opacity="0.55" />
-        <stop offset="100%" stop-color="${COLOR_HOT}" stop-opacity="0.05" />
-      </linearGradient>
-    </defs>
-    <rect x="0" y="0" width="${W}" height="${H}" fill="#11151a" />
-    <rect x="${padL}" y="${padT}" width="${innerW}" height="${innerH}" fill="#0d1117" />
-    ${yAxis}
-    ${xAxis}
-
-    <!-- area fill: blue half clipped below threshold, red half clipped above -->
-    <path d="${fill}" fill="url(#gradBlue_${uid})" clip-path="url(#clipBlue_${uid})" />
-    <path d="${fill}" fill="url(#gradRed_${uid})"  clip-path="url(#clipRed_${uid})" />
-
-    <!-- the line: drawn twice, each clipped to its half -->
-    <path d="${path}" fill="none" stroke="${COLOR_OK}"  stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" clip-path="url(#clipBlue_${uid})" />
-    <path d="${path}" fill="none" stroke="${COLOR_HOT}" stroke-width="1.9" stroke-linejoin="round" stroke-linecap="round" clip-path="url(#clipRed_${uid})" />
-
-    ${threshLine}
-    ${crossingMarks}
-    ${alertMark}
-    ${pin}
-
-    <g class="hover-layer" pointer-events="none" opacity="0">
-      <line class="hover-line" stroke="#8b949e" stroke-width="0.8" stroke-dasharray="3,3" />
-      <circle class="hover-dot" r="3.5" fill="${COLOR_OK}" stroke="#0b0d10" stroke-width="1.2" />
-      <rect class="hover-box" rx="3" fill="#0b0d10" stroke="#3a434f" stroke-width="0.8" />
-      <text class="hover-text" fill="#e6edf3" font-size="10.5" font-family="JetBrains Mono, monospace" text-anchor="start"></text>
-    </g>
-    <rect class="hover-target" x="${padL}" y="${padT}" width="${innerW}" height="${innerH}" fill="transparent" pointer-events="all" />
-  `;
-
-  // ---- hover handlers ----------------------------------------------------
-  const layer  = svg.querySelector('.hover-layer');
-  const lineEl = svg.querySelector('.hover-line');
-  const dotEl  = svg.querySelector('.hover-dot');
-  const boxEl  = svg.querySelector('.hover-box');
-  const textEl = svg.querySelector('.hover-text');
-  const target = svg.querySelector('.hover-target');
-
-  const clientToSvgX = (clientX) => {
-    const rect = svg.getBoundingClientRect();
-    return ((clientX - rect.left) / rect.width) * W;
-  };
-  function onMove(e) {
-    const cx = clientToSvgX(e.clientX);
-    if (cx < padL || cx > padL + innerW) { layer.setAttribute('opacity', '0'); return; }
-    let lo = 0, hi = pts.length - 1;
-    while (lo < hi) {
-      const mid = (lo + hi) >> 1;
-      if (pts[mid][0] < cx) lo = mid + 1; else hi = mid;
-    }
-    let idx = lo;
-    if (idx > 0 && Math.abs(pts[idx - 1][0] - cx) < Math.abs(pts[idx][0] - cx)) idx = idx - 1;
-    const px = pts[idx][0], py = pts[idx][1];
-    const v = valArr[idx];
-    const dt = new Date(tsArr[idx]);
-    const isBreach = v >= threshold;
-    const tsLabel = (rangeMinutes <= 1440) ? `${_fmtClockISTSec(dt)} IST` : `${_fmtFullIST(dt)} IST`;
-    const txt = `${label}: ${(v / 1_000_000).toFixed(2)}M  ·  ${tsLabel}${isBreach ? '  ⚠ BREACH' : ''}`;
-    const boxW = txt.length * 6.4 + 14;
-    let boxX = px + 10;
-    if (boxX + boxW > padL + innerW) boxX = px - boxW - 10;
-    const boxY = Math.max(padT + 4, py - 26);
-    lineEl.setAttribute('x1', px); lineEl.setAttribute('x2', px);
-    lineEl.setAttribute('y1', padT); lineEl.setAttribute('y2', padT + innerH);
-    dotEl.setAttribute('cx', px); dotEl.setAttribute('cy', py);
-    dotEl.setAttribute('fill', isBreach ? COLOR_HOT : COLOR_OK);
-    boxEl.setAttribute('x', boxX); boxEl.setAttribute('y', boxY);
-    boxEl.setAttribute('width', boxW); boxEl.setAttribute('height', 18);
-    boxEl.setAttribute('stroke', isBreach ? COLOR_HOT : '#3a434f');
-    textEl.setAttribute('x', boxX + 7); textEl.setAttribute('y', boxY + 12);
-    textEl.textContent = txt;
-    layer.setAttribute('opacity', '1');
-  }
-  function onLeave() { layer.setAttribute('opacity', '0'); }
-  target.addEventListener('mousemove', onMove);
-  target.addEventListener('mouseleave', onLeave);
-}
-
-// Auto-refresh: while the modal is open, re-fetch both graphs at their
-// currently-selected range every POLL_INTERVAL seconds so newly-arriving
-// data shows up without the user having to close + reopen.
-const MODAL_REFRESH_MS = 5000;
-let _modalRefreshTimer = null;
-
-function _startModalRefresh() {
-  if (_modalRefreshTimer) clearInterval(_modalRefreshTimer);
-  _modalRefreshTimer = setInterval(_refreshOpenGraphs, MODAL_REFRESH_MS);
-}
-function _stopModalRefresh() {
-  if (_modalRefreshTimer) {
-    clearInterval(_modalRefreshTimer);
-    _modalRefreshTimer = null;
-  }
-}
-function _refreshOpenGraphs() {
-  const wrap = document.getElementById('modal');
-  if (!wrap.classList.contains('open')) { _stopModalRefresh(); return; }
-  const jobId = wrap.dataset.jobId;
-  if (!jobId) return;
-  const alertTs = wrap.dataset.alertTs;
-  const alertTsMs = alertTs ? new Date(alertTs).getTime() : null;
-  for (const slot of ['cg', 'topic']) {
-    const activeBtn = document.querySelector(
-      `.range-group[data-slot="${slot}"] .range-btn.active`
-    );
-    if (!activeBtn) continue;
-    const minutes = parseInt(activeBtn.dataset.minutes, 10);
-    const valueKey = (slot === 'cg') ? 'cg_lag' : 'topic_lag';
-    const label    = (slot === 'cg')
-      ? 'Consumer Group Lag'
-      : 'Consumer Group / Topic Lag';
-    loadGraph(jobId, valueKey, label, minutes, alertTsMs, slot);
-  }
-}
-
-function _closeModal() {
-  document.getElementById('modal').classList.remove('open');
-  _stopModalRefresh();
-}
-document.getElementById('modal-close').addEventListener('click', _closeModal);
-document.getElementById('modal').addEventListener('click', (e) => {
-  if (e.target.id === 'modal') _closeModal();
-});
-
 // =============================================================================
-// Inject controls
+// Status / stats strip / health
 // =============================================================================
-const injectBtn = document.getElementById('inject-btn');
-const clearBtn = document.getElementById('clear-btn');
-
-injectBtn.addEventListener('click', async () => {
-  const sel = document.getElementById('inject-select');
-  const jobId = sel.value;
-  if (!jobId) return;
-  const streamRadio = document.querySelector('input[name="stream"]:checked');
-  const stream = streamRadio ? streamRadio.value : 'cg';
-  injectBtn.disabled = true;
-  const orig = injectBtn.textContent;
+async function refreshStatus() {
   try {
-    await api(`/api/inject/${encodeURIComponent(jobId)}?stream=${stream}&duration=120`, { method: 'POST' });
-    injectBtn.textContent = 'Spike Injected ✓';
-    injectBtn.classList.add('success');
-    refreshStatus();
-    setTimeout(() => refreshAlerts(), 5500);
-    setTimeout(() => {
-      injectBtn.textContent = orig;
-      injectBtn.classList.remove('success');
-      injectBtn.disabled = false;
-    }, 2400);
-  } catch (e) {
-    injectBtn.textContent = 'Failed';
-    setTimeout(() => { injectBtn.textContent = orig; injectBtn.disabled = false; }, 1800);
-  }
-});
-
-clearBtn.addEventListener('click', async () => {
-  const sel = document.getElementById('inject-select');
-  const jobId = sel.value;
-  if (!jobId) return;
-  clearBtn.disabled = true;
-  const orig = clearBtn.textContent;
-  try {
-    const res = await api(`/api/clear/${encodeURIComponent(jobId)}`, { method: 'POST' });
-    clearBtn.textContent = res.cleared ? 'Spike Cleared ✓' : 'No Active Spike';
-    clearBtn.classList.add('success');
-    refreshStatus();
-  } catch (e) {
-    clearBtn.textContent = 'Failed';
-  } finally {
-    setTimeout(() => {
-      clearBtn.textContent = orig;
-      clearBtn.classList.remove('success');
-      clearBtn.disabled = false;
-    }, 2200);
-  }
-});
-
-// =============================================================================
-// Boot
-// =============================================================================
-function tickClock() { document.getElementById('clock').textContent = formatClock(); }
-tickClock();
-setInterval(tickClock, 1000);
-
-refreshStatus();
-refreshAlerts();
-setInterval(refreshStatus, 5000);
-setInterval(refreshAlerts, 3000);
-
-// Deep-link: if the page is opened with ?job=<job_id> (e.g. from the
-// "View graph" button in a Slack alert), auto-open that job's modal once
-// the first /api/status response has populated _statusJobs.
-(function _openFromQuery() {
-  const params = new URLSearchParams(window.location.search);
-  const jobId = params.get('job');
-  if (!jobId) return;
-  let tries = 0;
-  const tryOpen = () => {
-    tries++;
-    if (_statusJobs && _statusJobs.length) {
-      openJobModal(jobId);
-    } else if (tries < 40) {        // ~8 s of patience
-      setTimeout(tryOpen, 200);
+    const data = await api('/api/status');
+    document.getElementById('stat-monitored').textContent = data.summary.monitored;
+    document.getElementById('stat-breaching').textContent = data.summary.breaching;
+    document.getElementById('stat-healthy').textContent = data.summary.healthy;
+    document.getElementById('stat-alerts').textContent = data.summary.alerts_24h;
+    document.getElementById('stat-envs').textContent = STATE.environments.join(' + ');
+    if (data.summary.last_poll_at) {
+      document.getElementById('last-poll').textContent =
+        `last poll: ${relTime(data.summary.last_poll_at)}`;
     }
-  };
-  tryOpen();
-})();
+    updateSlackIndicator(data.summary.slack_configured);
+  } catch (e) {
+    console.error('status fetch failed', e);
+  }
+}
 
+function updateSlackIndicator(on) {
+  const el = document.getElementById('slack-status');
+  el.innerHTML = on
+    ? '<span class="dot slack-on"></span><span>Slack: configured</span>'
+    : '<span class="dot"></span><span>Slack: not configured</span>';
+}
 
 // =============================================================================
-// AI Assistant — chat panel logic
+// Alert feed
+// =============================================================================
+async function refreshAlerts() {
+  try {
+    const data = await api('/api/alerts?limit=80');
+    const feed = document.getElementById('feed');
+    if (!data.alerts.length) {
+      feed.innerHTML = '<div class="empty-state">No alerts yet — system is monitoring.</div>';
+      document.getElementById('feed-count').textContent = '0 alerts';
+      return;
+    }
+    feed.innerHTML = data.alerts.map(renderAlert).join('');
+    document.getElementById('feed-count').textContent = `${data.alerts.length} alerts (24h)`;
+  } catch (e) {
+    console.error('alerts fetch failed', e);
+  }
+}
+
+function renderAlert(a) {
+  const t = new Date(a.created_at);
+  return `
+    <div class="alert">
+      <div class="alert-head">
+        <span class="alert-type ${a.alert_type}">${a.alert_type === 'breach' ? '▲ BREACH' : '✓ RESOLVED'}</span>
+        <span class="alert-time">${fmtClockIST(t)} IST</span>
+      </div>
+      <div class="alert-topic">${a.topic} · ${(a.environment||'').toUpperCase()}</div>
+      <div class="alert-team">${a.team || ''} · ${a.channel || ''}</div>
+      <div class="alert-lag">Lag: ${FMT_K(a.lag_value)}${a.delivered_to_slack ? '<span class="alert-delivered">DELIVERED ✓</span>' : ''}</div>
+    </div>
+  `;
+}
+
+// =============================================================================
+// AI assistant
 // =============================================================================
 const AI_FAB = document.getElementById('ai-fab');
-const AI_FAB_DOT = document.getElementById('ai-fab-dot');
 const AI_PANEL = document.getElementById('ai-panel');
 const AI_CLOSE = document.getElementById('ai-close');
 const AI_MSGS = document.getElementById('ai-msgs');
@@ -1654,32 +1001,20 @@ const AI_SEND = document.getElementById('ai-send');
 const AI_SUGGEST = document.getElementById('ai-suggest');
 const AI_STATUS_SUB = document.getElementById('ai-status-sub');
 
-// Persists in-memory only — refresh = clean slate. Fine for v1.
 let _aiHistory = [];
 let _aiBusy = false;
 let _aiAvailable = null;
 
 function _aiEscape(s) {
-  return String(s)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
-
-// Tiny markdown -> HTML for assistant messages. Intentionally limited:
-//   **bold**, `code`, ```fenced```, paragraph breaks, simple lists.
-// We escape first, then re-introduce only the tags we generate.
 function _aiRenderMarkdown(text) {
   let s = _aiEscape(text);
-  // Fenced code blocks
-  s = s.replace(/```([\s\S]*?)```/g, (_, code) =>
-    `<pre>${code.replace(/^\n/, '')}</pre>`);
-  // Inline code
+  s = s.replace(/```([\s\S]*?)```/g, (_, code) => `<pre>${code.replace(/^\n/,'')}</pre>`);
   s = s.replace(/`([^`\n]+)`/g, '<code>$1</code>');
-  // Bold
   s = s.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
-  // Bullet lists (line-by-line)
   const lines = s.split(/\n/);
-  let out = '';
-  let inList = false;
+  let out = '', inList = false;
   for (const ln of lines) {
     const m = /^\s*[-*]\s+(.*)$/.exec(ln);
     if (m) {
@@ -1691,11 +1026,8 @@ function _aiRenderMarkdown(text) {
     }
   }
   if (inList) out += '</ul>';
-  // Collapse trailing breaks
-  out = out.replace(/(<br>\s*){2,}/g, '<br><br>').replace(/<br>$/, '');
-  return out;
+  return out.replace(/(<br>\s*){2,}/g, '<br><br>').replace(/<br>$/, '');
 }
-
 function _aiAddMessage(role, content, opts = {}) {
   const div = document.createElement('div');
   div.className = `ai-msg ${role}`;
@@ -1717,124 +1049,139 @@ function _aiAddMessage(role, content, opts = {}) {
   }
   AI_MSGS.appendChild(div);
   AI_MSGS.scrollTop = AI_MSGS.scrollHeight;
-  return div;
 }
-
 function _aiAddThinking() {
   const div = document.createElement('div');
-  div.className = 'ai-thinking';
-  div.id = 'ai-thinking';
+  div.className = 'ai-thinking'; div.id = 'ai-thinking';
   div.innerHTML = '<span></span><span></span><span></span>';
   AI_MSGS.appendChild(div);
   AI_MSGS.scrollTop = AI_MSGS.scrollHeight;
 }
-
 function _aiRemoveThinking() {
   const t = document.getElementById('ai-thinking');
   if (t) t.remove();
 }
-
 async function _aiCheckAvailability() {
   try {
     const r = await fetch('/api/chat/health');
     const j = await r.json();
     _aiAvailable = !!j.available;
-  } catch (_e) {
-    _aiAvailable = false;
-  }
+  } catch (_e) { _aiAvailable = false; }
   if (!_aiAvailable) {
     AI_FAB.classList.add('disabled');
-    AI_FAB.title = 'Chatbot unavailable — set OPENAI_API_KEY in .env and restart';
+    AI_FAB.title = 'Chatbot unavailable — set GEMINI_API_KEY in .env';
     AI_STATUS_SUB.textContent = 'Disabled — no LLM credentials configured';
     AI_STATUS_SUB.style.color = 'var(--red)';
-    AI_SEND.disabled = true;
-    AI_INPUT.disabled = true;
-    AI_INPUT.placeholder = 'Set OPENAI_API_KEY in .env to enable';
+    AI_SEND.disabled = true; AI_INPUT.disabled = true;
+    AI_INPUT.placeholder = 'Set GEMINI_API_KEY in .env to enable';
   }
 }
-
 function _aiOpen() {
-  if (_aiAvailable === false) {
-    // Open anyway so user can see the disabled-state explanation
-    AI_PANEL.classList.add('open');
-    return;
-  }
   AI_PANEL.classList.add('open');
   AI_PANEL.setAttribute('aria-hidden', 'false');
-  setTimeout(() => AI_INPUT.focus(), 200);
+  if (_aiAvailable) setTimeout(() => AI_INPUT.focus(), 200);
 }
 function _aiClose() {
   AI_PANEL.classList.remove('open');
   AI_PANEL.setAttribute('aria-hidden', 'true');
 }
-
 async function _aiSend(message) {
   if (_aiBusy || !message || !_aiAvailable) return;
-  _aiBusy = true;
-  AI_SEND.disabled = true;
-  AI_INPUT.value = '';
-  AI_SUGGEST.style.display = 'none';   // hide quick-prompts after first message
-
+  _aiBusy = true; AI_SEND.disabled = true; AI_INPUT.value = '';
+  AI_SUGGEST.style.display = 'none';
   _aiAddMessage('user', message);
   _aiHistory.push({ role: 'user', content: message });
   _aiAddThinking();
-
   try {
     const r = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message, history: _aiHistory.slice(0, -1) }),
     });
     _aiRemoveThinking();
     if (!r.ok) {
-      const errText = await r.text();
-      _aiAddMessage('error', `Request failed (${r.status}): ${errText.slice(0, 300)}`);
+      _aiAddMessage('error', `Request failed (${r.status}): ${(await r.text()).slice(0,300)}`);
       return;
     }
     const data = await r.json();
     _aiAddMessage('assistant', data.reply, { toolCalls: data.tool_calls });
     _aiHistory.push({ role: 'assistant', content: data.reply });
-    // Keep history under a reasonable size
     if (_aiHistory.length > 18) _aiHistory = _aiHistory.slice(-18);
   } catch (e) {
     _aiRemoveThinking();
     _aiAddMessage('error', `Network error: ${e.message}`);
   } finally {
-    _aiBusy = false;
-    AI_SEND.disabled = false;
-    AI_INPUT.focus();
+    _aiBusy = false; AI_SEND.disabled = false; AI_INPUT.focus();
   }
 }
-
-// Wire up controls
 AI_FAB.addEventListener('click', _aiOpen);
 AI_CLOSE.addEventListener('click', _aiClose);
 AI_SEND.addEventListener('click', () => {
-  const msg = AI_INPUT.value.trim();
-  if (msg) _aiSend(msg);
+  const m = AI_INPUT.value.trim(); if (m) _aiSend(m);
 });
 AI_INPUT.addEventListener('keydown', (ev) => {
   if (ev.key === 'Enter' && !ev.shiftKey) {
     ev.preventDefault();
-    const msg = AI_INPUT.value.trim();
-    if (msg) _aiSend(msg);
+    const m = AI_INPUT.value.trim(); if (m) _aiSend(m);
   }
 });
 AI_INPUT.addEventListener('input', () => {
-  // auto-grow
   AI_INPUT.style.height = 'auto';
   AI_INPUT.style.height = Math.min(AI_INPUT.scrollHeight, 120) + 'px';
 });
 AI_SUGGEST.addEventListener('click', (ev) => {
   const btn = ev.target.closest('button[data-q]');
-  if (!btn) return;
-  _aiSend(btn.dataset.q);
+  if (btn) _aiSend(btn.dataset.q);
 });
 document.addEventListener('keydown', (ev) => {
   if (ev.key === 'Escape' && AI_PANEL.classList.contains('open')) _aiClose();
 });
 
-_aiCheckAvailability();
+// =============================================================================
+// Boot
+// =============================================================================
+function tickClock() {
+  const d = new Date();
+  document.getElementById('clock').textContent = fmtFullIST(d) + ' IST';
+}
+
+async function boot() {
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  // Load topics + panels
+  try {
+    const t = await api('/api/topics');
+    STATE.topics = t.topics || [];
+    STATE.environments = t.environments || [];
+  } catch (e) {
+    document.getElementById('env-grid').innerHTML = `<div class="loading">Failed to load topics: ${e.message}</div>`;
+    return;
+  }
+  try {
+    const p = await api('/api/panels');
+    STATE.panels = p.panels || [];
+  } catch (e) {
+    document.getElementById('env-grid').innerHTML = `<div class="loading">Failed to load panels: ${e.message}</div>`;
+    return;
+  }
+
+  STATE.selected_topic = STATE.topics[0] || null;
+  renderTopicDropdown();
+  renderRangeButtons();
+  renderEnvGrid();
+  reloadAllPanels();
+
+  // Background pollers
+  refreshStatus();
+  refreshAlerts();
+  setInterval(refreshStatus, 5000);
+  setInterval(refreshAlerts, 5000);
+  setInterval(reloadAllPanels, 30000);   // refresh charts every 30s
+
+  _aiCheckAvailability();
+}
+
+boot();
 </script>
 </body>
 </html>

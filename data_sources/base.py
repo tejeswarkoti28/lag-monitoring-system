@@ -1,9 +1,10 @@
 """
 Data source interface.
 
-Every implementation (simulator, Prometheus, Lenses, ...) inherits DataSource
-and overrides poll_all(). Optional methods (synthesize_history, inject_spike)
-have safe defaults so production sources only implement what they need.
+Implementations (currently only LensesDataSource) inherit DataSource and
+override poll_all(). Historical data is no longer the data source's
+responsibility — it's owned by HistoryDB, which persists every poll to
+SQLite. Long-range chart views read from there, not from the source.
 """
 from __future__ import annotations
 
@@ -33,17 +34,8 @@ class LagReading:
 
 
 class DataSource(abc.ABC):
-    """
-    Abstract data source. The monitoring engine only depends on this interface.
-
-    Required:
-      - poll_all() — return current lag readings for every job
-
-    Optional (defaults are no-ops):
-      - synthesize_history() — historical time series for a job (Prometheus
-        range query in production; deterministic sim in demo)
-      - inject_spike() / clear_injection() / is_injecting() — demo controls
-        only the simulator implements; production sources return False.
+    """Abstract data source. The monitoring engine only depends on this
+    interface — `poll_all()` is the only required method.
     """
 
     def __init__(self, *, catalog: list[dict], environments: list[str]) -> None:
@@ -64,44 +56,7 @@ class DataSource(abc.ABC):
     def jobs(self) -> list[dict]:
         return list(self._jobs)
 
-    # ---- required ----------------------------------------------------------
     @abc.abstractmethod
     def poll_all(self, *, at: Optional[float] = None) -> list[LagReading]:
         """Return one LagReading per job at the current moment (or `at`)."""
         ...
-
-    # ---- optional ----------------------------------------------------------
-    def synthesize_history(
-        self,
-        job_id: str,
-        *,
-        start_ts: float,
-        end_ts: float,
-        step_seconds: float,
-    ) -> list[dict]:
-        """Return historical readings between start_ts and end_ts.
-
-        Default: empty list. Real sources should query their TSDB.
-        Each item: {"ts": iso8601, "cg_lag": int, "topic_lag": int, "lag": int}
-        """
-        return []
-
-    def inject_spike(
-        self,
-        job_id: str,
-        *,
-        stream: str = "cg",
-        duration_seconds: int = 120,
-    ) -> bool:
-        """Demo-only: force a job above threshold. Production sources return False."""
-        return False
-
-    def clear_injection(self, job_id: str) -> bool:
-        return False
-
-    def is_injecting(self, job_id: str) -> bool:
-        return False
-
-    def active_injection(self, job_id: str) -> Optional[dict]:
-        """Return the active injection record (with 'stream' key) or None."""
-        return None

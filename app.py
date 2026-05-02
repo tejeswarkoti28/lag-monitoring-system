@@ -3,15 +3,17 @@ Kafka Consumer Lag Monitor — FastAPI backend
 ============================================
 Polls a pluggable DataSource every POLL_INTERVAL_SECONDS, evaluates breaches
 through an edge-trigger AlertEngine, persists alerts to SQLite, and routes
-Slack notifications per team. Also serves a static dashboard and an AI
-chatbot endpoint that can answer questions about the live data.
+Slack notifications per team. Serves a static dashboard whose charts are
+declarative panels driven from config/panels.json, and an AI chatbot that
+can answer questions about the live data.
 
 Run:    python app.py     # then open http://localhost:8000
 
-Two pluggable seams:
-  * data_sources/  — simulator (default) or Prometheus (production).
-                     Switch via DATA_SOURCE=simulator|prometheus.
-  * ai/           — LLM-backed chatbot. OpenAI default, swappable.
+Three pluggable seams:
+  * config/data_sources.json  — registry of data sources (today: Prometheus
+                                 via Grafana proxy)
+  * config/panels.json         — declarative chart definitions
+  * ai/                         — LLM-backed chatbot (Gemini)
 """
 from __future__ import annotations
 
@@ -32,7 +34,15 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from data_sources import DataSource, LagReading, get_data_source
+from data_sources import (
+    DataSource,
+    LagReading,
+    build_all_data_sources,
+    get_primary_data_source,
+)
+from data_sources.prometheus import PrometheusDataSource
+from panels import Panel, PanelRegistry
+from panels.registry import default_panel_registry
 
 # Load .env from the project root before any os.environ reads.
 try:
@@ -63,7 +73,11 @@ def _load_config(path: str) -> dict:
 
 
 _cfg = _load_config(CONFIG_PATH)
-THRESHOLD_MESSAGES: int = int(_cfg.get("threshold_messages", 4_000_000))
+# Real Walmart consumer-group lag values run in the low thousands per partition,
+# not millions. The env override exists so you can tune without editing JSON.
+THRESHOLD_MESSAGES: int = int(
+    os.environ.get("LAG_THRESHOLD") or _cfg.get("threshold_messages", 5000)
+)
 ENVIRONMENTS: list[str] = list(_cfg.get("environments", ["eus", "scus"]))
 JOB_CATALOG: list[dict] = list(_cfg.get("jobs", []))
 
@@ -72,7 +86,6 @@ PUBLIC_URL: str = os.environ.get(
     "LAG_MONITOR_PUBLIC_URL", "http://localhost:8000"
 ).rstrip("/")
 HISTORY_RETENTION_MINUTES: int = 60
-WARMUP_MINUTES: int = 30
 DB_PATH: str = os.environ.get("LAG_MONITOR_DB", "lag_monitor.db")
 
 
@@ -570,26 +583,6 @@ class Monitor:
                 team=j["team"], channel=j["channel"],
             )
 
-    def warmup(self, minutes: int = WARMUP_MINUTES) -> None:
-        now = time.time()
-        steps = int((minutes * 60) / POLL_INTERVAL_SECONDS)
-        # For the simulator, we can fabricate history retroactively — useful
-        # so the dashboard isn't blank on first launch. For real Lenses, this
-        # is a no-op (LensesDataSource.synthesize_history returns []).
-        for i in range(steps, 0, -1):
-            ts = now - i * POLL_INTERVAL_SECONDS
-            readings = self.source.poll_all(at=ts)
-            batch: list[tuple[str, int, int, int]] = []
-            for r in readings:
-                self._record_history(r, persist=False)
-                batch.append((
-                    r.job_id,
-                    int(r.timestamp.timestamp()),
-                    r.consumer_group_lag,
-                    r.topic_lag,
-                ))
-            self.history_db.insert_batch(batch)
-
     async def run(self) -> None:
         try:
             while not self._stopping.is_set():
@@ -605,7 +598,7 @@ class Monitor:
         readings = self.source.poll_all()
         batch: list[tuple[str, int, int, int]] = []
         for r in readings:
-            self._record_history(r, persist=False)
+            self._record_history(r)
             batch.append((
                 r.job_id,
                 int(r.timestamp.timestamp()),
@@ -618,11 +611,8 @@ class Monitor:
         self.history_db.insert_batch(batch)
         self.last_poll_ts = now_utc()
 
-    def _record_history(self, r: LagReading, *, persist: bool = True) -> None:
-        """Update the in-memory ring (used for live sparklines on the job grid)
-        and optionally persist to HistoryDB. Persist is False during warmup
-        and inside _poll_once because both batch the SQLite write themselves.
-        """
+    def _record_history(self, r: LagReading) -> None:
+        """Update the in-memory ring (used for live sparklines on the job grid)."""
         st = self.jobs.get(r.job_id)
         if st is None:
             return
@@ -638,11 +628,6 @@ class Monitor:
             h for h in st.history
             if datetime.fromisoformat(h["ts"]).timestamp() >= cutoff
         ]
-        if persist:
-            self.history_db.insert_batch([(
-                r.job_id, int(r.timestamp.timestamp()),
-                r.consumer_group_lag, r.topic_lag,
-            )])
 
     async def _handle_event(self, event: AlertEvent) -> None:
         delivered = await self.notifier.send(event)
@@ -675,12 +660,31 @@ class Monitor:
 # =============================================================================
 # Wire it all up
 # =============================================================================
-_source: DataSource = get_data_source(catalog=JOB_CATALOG, environments=ENVIRONMENTS)
+_data_sources: dict[str, DataSource] = build_all_data_sources(
+    catalog=JOB_CATALOG, environments=ENVIRONMENTS,
+)
+_source: DataSource = get_primary_data_source(
+    catalog=JOB_CATALOG, environments=ENVIRONMENTS,
+)
+_panels: PanelRegistry = default_panel_registry()
 _engine = AlertEngine()
 _db = AlertDB(DB_PATH)
 _history_db = HistoryDB(DB_PATH)
 _notifier = SlackNotifier()
 _monitor = Monitor(_source, _engine, _notifier, _db, _history_db)
+
+
+def _resolve_data_source_for_panel(panel: Panel) -> DataSource:
+    ds = _data_sources.get(panel.data_source)
+    if ds is None:
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                f"panel {panel.id!r} references unknown data source "
+                f"{panel.data_source!r}"
+            ),
+        )
+    return ds
 
 
 # Chatbot — only constructed if the configured LLM provider has credentials.
@@ -717,7 +721,6 @@ async def lifespan(_: FastAPI):
             print(f"[history] purged {deleted} rows older than {HISTORY_RETENTION_DAYS} days")
     except Exception as exc:
         print(f"[history] cleanup failed: {exc}", file=sys.stderr)
-    _monitor.warmup(minutes=WARMUP_MINUTES)
     _monitor.start()
     try:
         yield
@@ -756,7 +759,7 @@ def health():
         "threshold": THRESHOLD_MESSAGES,
         "poll_interval_seconds": POLL_INTERVAL_SECONDS,
         "jobs_monitored": len(_monitor.jobs),
-        "data_source": os.environ.get("DATA_SOURCE", "simulator"),
+        "data_source": "lenses",
         "chatbot_available": _chatbot is not None,
     }
 
@@ -782,10 +785,6 @@ def status():
             "consumer_group_lag": cur.consumer_group_lag if cur else 0,
             "topic_lag": cur.topic_lag if cur else 0,
             "status": "breach" if is_breach else "ok",
-            "injecting": _source.is_injecting(st.job_id),
-            "injecting_stream": (
-                _source.active_injection(st.job_id) or {}
-            ).get("stream"),
             "timestamp": iso(cur.timestamp) if cur else None,
             "sparkline": [h["lag"] for h in st.history[-180:]],
         })
@@ -876,27 +875,106 @@ def team_breakdown(hours: int = 168):
     return {"window_hours": hours, "teams": out}
 
 
-# Inject / clear (demo controls — work only with simulator) ------------------
-@app.post("/api/inject/{job_id}")
-def inject(job_id: str, stream: str = "cg", duration: int = 120):
-    if stream not in ("cg", "topic"):
-        raise HTTPException(status_code=400, detail="stream must be 'cg' or 'topic'")
-    ok = _source.inject_spike(job_id, stream=stream, duration_seconds=duration)
-    if not ok:
+# Topics catalog -------------------------------------------------------------
+# What the dashboard's topic dropdown needs. One entry per (topic,
+# consumer_group, team) tuple from config/jobs.json. Environments are kept
+# separate; the dashboard uses the global ENVIRONMENTS list to render columns.
+@app.get("/api/topics")
+def topics():
+    return {
+        "environments": ENVIRONMENTS,
+        "topics": [
+            {
+                "topic": entry["topic"],
+                "consumer_group": entry["consumer_group"],
+                "team": entry.get("team", ""),
+                "channel": entry.get("channel", ""),
+            }
+            for entry in JOB_CATALOG
+        ],
+    }
+
+
+# Panels ---------------------------------------------------------------------
+# Read by the dashboard at load time. Each entry tells the frontend what
+# charts to render and which scope variables the chart needs in its query.
+@app.get("/api/panels")
+def panels_list():
+    return {
+        "panels": _panels.to_json(),
+        "sections": list(_panels.sections().keys()),
+    }
+
+
+# Per-panel range query.
+# The dashboard hits this once per chart per refresh cycle. We forward the
+# panel's PromQL — with $env / $topic / $consumer_group substituted — to the
+# panel's data source's query_range method, then return [(ts, value), ...].
+@app.get("/api/panel/{panel_id}/range")
+def panel_range(
+    panel_id: str,
+    minutes: int = 720,
+    env: Optional[str] = None,
+    topic: Optional[str] = None,
+    consumer_group: Optional[str] = None,
+    step_seconds: Optional[int] = None,
+):
+    try:
+        panel = _panels.get(panel_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+    ds = _resolve_data_source_for_panel(panel)
+    if not isinstance(ds, PrometheusDataSource):
         raise HTTPException(
-            status_code=404,
-            detail=(
-                f"unknown job_id or current data source does not support injection: {job_id}. "
-                f"(Inject only works with DATA_SOURCE=simulator.)"
-            ),
+            status_code=500,
+            detail="only PrometheusDataSource supports range queries today",
         )
-    return {"ok": True, "job_id": job_id, "stream": stream, "duration": duration}
+
+    minutes = max(1, min(int(minutes), 60 * 24 * 90))
+    end_ts = time.time()
+    start_ts = end_ts - minutes * 60
+    step = float(step_seconds) if step_seconds else _panel_step_for(minutes)
+
+    try:
+        expr = panel.build_query(
+            static_labels=ds.static_labels,
+            env=env, topic=topic, consumer_group=consumer_group,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    series = ds.query_range(
+        expr, start_ts=start_ts, end_ts=end_ts, step_seconds=step,
+    )
+    return {
+        "panel_id": panel_id,
+        "title": panel.title,
+        "expr": expr,
+        "scope": {"env": env, "topic": topic, "consumer_group": consumer_group},
+        "minutes": minutes,
+        "step_seconds": step,
+        "unit": panel.unit,
+        "y_min": panel.y_min,
+        "y_max": panel.y_max,
+        "color": panel.color,
+        "points": [
+            {"ts": ts, "value": v} for ts, v in series
+        ],
+    }
 
 
-@app.post("/api/clear/{job_id}")
-def clear(job_id: str):
-    cleared = _source.clear_injection(job_id)
-    return {"ok": True, "job_id": job_id, "cleared": cleared}
+def _panel_step_for(minutes: int) -> float:
+    """Pick a step that yields ~500-720 points per range, like Grafana."""
+    if minutes <= 30:        return 5
+    if minutes <= 360:       return 30
+    if minutes <= 720:       return 60
+    if minutes <= 1440:      return 120
+    if minutes <= 2880:      return 300
+    if minutes <= 21_600:    return 1800
+    if minutes <= 43_200:    return 3600
+    if minutes <= 129_600:   return 14400
+    return 28800
 
 
 # Chatbot --------------------------------------------------------------------
