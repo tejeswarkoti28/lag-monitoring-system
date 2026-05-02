@@ -5,6 +5,7 @@
     "type": "prometheus_via_grafana_proxy",
     "url": "https://grafana.mms.walmart.net/api/datasources/proxy/uid/production",
     "auth": null,
+    "verify_ssl": false,
     "static_labels": {
       "job": "managed-kafka-consumer-service",
       "ooa": "kafka-v2-ca-shared-secure-prod",

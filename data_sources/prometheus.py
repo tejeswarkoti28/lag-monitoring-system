@@ -42,6 +42,7 @@ class PrometheusDataSource(DataSource):
         base_url: str,
         auth_token: Optional[str] = None,
         static_labels: Optional[dict] = None,
+        verify_ssl: bool = True,
         timeout_seconds: float = 5.0,
     ) -> None:
         super().__init__(catalog=catalog, environments=environments)
@@ -53,7 +54,10 @@ class PrometheusDataSource(DataSource):
         self._base_url = base_url.rstrip("/")
         self._auth_token = auth_token
         self._static_labels = dict(static_labels or {})
-        self._client = httpx.Client(timeout=timeout_seconds)
+        # verify_ssl=False is intended for internal corporate hosts whose
+        # certs are signed by an internal CA Python doesn't trust by default.
+        # Only safe when you're already inside the corporate network.
+        self._client = httpx.Client(timeout=timeout_seconds, verify=verify_ssl)
 
     @property
     def static_labels(self) -> dict:
