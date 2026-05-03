@@ -3,17 +3,15 @@ Kafka Consumer Lag Monitor — FastAPI backend
 ============================================
 Polls a pluggable DataSource every POLL_INTERVAL_SECONDS, evaluates breaches
 through an edge-trigger AlertEngine, persists alerts to SQLite, and routes
-Slack notifications per team. Serves a static dashboard whose charts are
-declarative panels driven from config/panels.json, and an AI chatbot that
-can answer questions about the live data.
+Slack notifications per team. Also serves a static dashboard and an AI
+chatbot endpoint that can answer questions about the live data.
 
 Run:    python app.py     # then open http://localhost:8000
 
-Three pluggable seams:
-  * config/data_sources.json  — registry of data sources (today: Prometheus
-                                 via Grafana proxy)
-  * config/panels.json         — declarative chart definitions
-  * ai/                         — LLM-backed chatbot (Gemini)
+Two pluggable seams:
+  * data_sources/  — simulator (default) or Prometheus (production).
+                     Switch via DATA_SOURCE=simulator|prometheus.
+  * ai/           — LLM-backed chatbot. OpenAI default, swappable.
 """
 from __future__ import annotations
 
@@ -34,15 +32,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from data_sources import (
-    DataSource,
-    LagReading,
-    build_all_data_sources,
-    get_primary_data_source,
-)
-from data_sources.prometheus import PrometheusDataSource
-from panels import Panel, PanelRegistry
-from panels.registry import default_panel_registry
+from data_sources import DataSource, LagReading, get_data_source
 
 # Load .env from the project root before any os.environ reads.
 try:
@@ -81,7 +71,7 @@ THRESHOLD_MESSAGES: int = int(
 ENVIRONMENTS: list[str] = list(_cfg.get("environments", ["eus", "scus"]))
 JOB_CATALOG: list[dict] = list(_cfg.get("jobs", []))
 
-POLL_INTERVAL_SECONDS: float = float(os.environ.get("POLL_INTERVAL_SECONDS", "5"))
+POLL_INTERVAL_SECONDS: float = float(os.environ.get("POLL_INTERVAL_SECONDS", "60"))
 PUBLIC_URL: str = os.environ.get(
     "LAG_MONITOR_PUBLIC_URL", "http://localhost:8000"
 ).rstrip("/")
@@ -660,31 +650,12 @@ class Monitor:
 # =============================================================================
 # Wire it all up
 # =============================================================================
-_data_sources: dict[str, DataSource] = build_all_data_sources(
-    catalog=JOB_CATALOG, environments=ENVIRONMENTS,
-)
-_source: DataSource = get_primary_data_source(
-    catalog=JOB_CATALOG, environments=ENVIRONMENTS,
-)
-_panels: PanelRegistry = default_panel_registry()
+_source: DataSource = get_data_source(catalog=JOB_CATALOG, environments=ENVIRONMENTS)
 _engine = AlertEngine()
 _db = AlertDB(DB_PATH)
 _history_db = HistoryDB(DB_PATH)
 _notifier = SlackNotifier()
 _monitor = Monitor(_source, _engine, _notifier, _db, _history_db)
-
-
-def _resolve_data_source_for_panel(panel: Panel) -> DataSource:
-    ds = _data_sources.get(panel.data_source)
-    if ds is None:
-        raise HTTPException(
-            status_code=500,
-            detail=(
-                f"panel {panel.id!r} references unknown data source "
-                f"{panel.data_source!r}"
-            ),
-        )
-    return ds
 
 
 # Chatbot — only constructed if the configured LLM provider has credentials.
@@ -873,108 +844,6 @@ def team_breakdown(hours: int = 168):
         })
     out.sort(key=lambda x: -x["breach_count"])
     return {"window_hours": hours, "teams": out}
-
-
-# Topics catalog -------------------------------------------------------------
-# What the dashboard's topic dropdown needs. One entry per (topic,
-# consumer_group, team) tuple from config/jobs.json. Environments are kept
-# separate; the dashboard uses the global ENVIRONMENTS list to render columns.
-@app.get("/api/topics")
-def topics():
-    return {
-        "environments": ENVIRONMENTS,
-        "topics": [
-            {
-                "topic": entry["topic"],
-                "consumer_group": entry["consumer_group"],
-                "team": entry.get("team", ""),
-                "channel": entry.get("channel", ""),
-            }
-            for entry in JOB_CATALOG
-        ],
-    }
-
-
-# Panels ---------------------------------------------------------------------
-# Read by the dashboard at load time. Each entry tells the frontend what
-# charts to render and which scope variables the chart needs in its query.
-@app.get("/api/panels")
-def panels_list():
-    return {
-        "panels": _panels.to_json(),
-        "sections": list(_panels.sections().keys()),
-    }
-
-
-# Per-panel range query.
-# The dashboard hits this once per chart per refresh cycle. We forward the
-# panel's PromQL — with $env / $topic / $consumer_group substituted — to the
-# panel's data source's query_range method, then return [(ts, value), ...].
-@app.get("/api/panel/{panel_id}/range")
-def panel_range(
-    panel_id: str,
-    minutes: int = 720,
-    env: Optional[str] = None,
-    topic: Optional[str] = None,
-    consumer_group: Optional[str] = None,
-    step_seconds: Optional[int] = None,
-):
-    try:
-        panel = _panels.get(panel_id)
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
-
-    ds = _resolve_data_source_for_panel(panel)
-    if not isinstance(ds, PrometheusDataSource):
-        raise HTTPException(
-            status_code=500,
-            detail="only PrometheusDataSource supports range queries today",
-        )
-
-    minutes = max(1, min(int(minutes), 60 * 24 * 90))
-    end_ts = time.time()
-    start_ts = end_ts - minutes * 60
-    step = float(step_seconds) if step_seconds else _panel_step_for(minutes)
-
-    try:
-        expr = panel.build_query(
-            static_labels=ds.static_labels,
-            env=env, topic=topic, consumer_group=consumer_group,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-
-    series = ds.query_range(
-        expr, start_ts=start_ts, end_ts=end_ts, step_seconds=step,
-    )
-    return {
-        "panel_id": panel_id,
-        "title": panel.title,
-        "expr": expr,
-        "scope": {"env": env, "topic": topic, "consumer_group": consumer_group},
-        "minutes": minutes,
-        "step_seconds": step,
-        "unit": panel.unit,
-        "y_min": panel.y_min,
-        "y_max": panel.y_max,
-        "color": panel.color,
-        "points": [
-            {"ts": ts, "value": v} for ts, v in series
-        ],
-    }
-
-
-def _panel_step_for(minutes: int) -> float:
-    """Pick a step that yields ~500-720 points per range, like Grafana."""
-    if minutes <= 30:        return 5
-    if minutes <= 360:       return 30
-    if minutes <= 720:       return 60
-    if minutes <= 1440:      return 120
-    if minutes <= 2880:      return 300
-    if minutes <= 21_600:    return 1800
-    if minutes <= 43_200:    return 3600
-    if minutes <= 129_600:   return 14400
-    return 28800
 
 
 # Chatbot --------------------------------------------------------------------
