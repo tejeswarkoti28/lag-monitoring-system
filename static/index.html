@@ -834,15 +834,29 @@ function fmtDateIST(d) {
   const i = _toIST(d);
   return String(i.getUTCMonth()+1).padStart(2,'0') + '-' + String(i.getUTCDate()).padStart(2,'0');
 }
-// 30-min spacing for any range up to 24h; scales up for longer windows so
-// labels remain legible. Always called with the chart's actual visible span.
+// Pick a "nice" tick step (in seconds) so the chart shows ~10-12 labels
+// across the visible time span. Each range button gets an appropriate
+// granularity: 5-min for 30m, 30-min for 6h, 2h for 24h, etc.
 function _chooseTimeStep(spanSec) {
-  if (spanSec <= 24 * 3600)   return 1800;     // ≤24h → 30 min
-  if (spanSec <= 3 * 86400)   return 3600;     // ≤3d  → 1h
-  if (spanSec <= 7 * 86400)   return 21600;    // ≤7d  → 6h
-  if (spanSec <= 30 * 86400)  return 86400;    // ≤30d → 1d
-  if (spanSec <= 90 * 86400)  return 604800;   // ≤90d → 1w
-  return 2592000;                              // >90d → 30d
+  const STEPS = [
+    60,        // 1 min
+    300,       // 5 min
+    600,       // 10 min
+    1800,      // 30 min
+    3600,      // 1 h
+    7200,      // 2 h
+    21600,     // 6 h
+    43200,     // 12 h
+    86400,     // 1 d
+    259200,    // 3 d
+    604800,    // 7 d
+    2592000,   // 30 d
+  ];
+  const TARGET = 12;
+  for (const s of STEPS) {
+    if (spanSec / s <= TARGET) return s;
+  }
+  return STEPS[STEPS.length - 1];
 }
 function relTime(iso) {
   const d = new Date(iso);
