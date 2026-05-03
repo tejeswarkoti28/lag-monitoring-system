@@ -309,151 +309,116 @@
   .card-pill.healthy { background: var(--green-soft); color: var(--green); border: 1px solid #2c5d39; }
   .card-pill.breach { background: var(--red-soft); color: var(--red); border: 1px solid #6d2c2c; }
 
-  /* Detail view back button */
-  .detail-back {
-    background: var(--bg-2); color: var(--text-dim);
-    border: 1px solid var(--line);
-    padding: 7px 12px; border-radius: 5px;
-    font: 600 11.5px 'JetBrains Mono', monospace;
-    cursor: pointer;
-    margin-bottom: 12px;
-    display: inline-flex; align-items: center; gap: 6px;
+  /* Job detail modal */
+  .modal-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(5, 8, 12, 0.72);
+    backdrop-filter: blur(2px);
+    display: none;
+    align-items: flex-start; justify-content: center;
+    padding: 30px 20px;
+    overflow-y: auto;
+    z-index: 100;
   }
-  .detail-back:hover { color: var(--text); border-color: var(--line-2); }
-
-  .job-view-head {
+  .modal-backdrop.open { display: flex; }
+  .modal {
     background: var(--bg-1);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 12px 16px;
-    margin-bottom: 12px;
-    display: flex; gap: 18px; flex-wrap: wrap; align-items: center;
+    border: 1px solid var(--line-2);
+    border-radius: 10px;
+    width: 100%; max-width: 900px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    display: flex; flex-direction: column;
   }
-  .job-view-head .field {
-    display: flex; flex-direction: column; gap: 2px;
-  }
-  .job-view-head .field-label {
-    font: 600 9.5px 'JetBrains Mono', monospace;
-    color: var(--text-mute); letter-spacing: 0.6px; text-transform: uppercase;
-  }
-  .job-view-head .field-value {
-    font: 500 12px 'JetBrains Mono', monospace; color: var(--text);
-  }
-  .job-view-head .status-pill {
-    margin-left: auto;
-    padding: 4px 10px; border-radius: 4px;
-    font: 700 10.5px 'JetBrains Mono', monospace;
-    letter-spacing: 0.5px;
-  }
-  .status-pill.ok { background: var(--green-soft); color: var(--green); border: 1px solid #2c5d39; }
-  .status-pill.breach { background: var(--red-soft); color: var(--red); border: 1px solid #6d2c2c; }
-
-  .panel-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
-  }
-  @media (max-width: 1500px) {
-    .panel-grid { grid-template-columns: 1fr; }
-  }
-  .panel-card {
-    background: var(--bg-1);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 10px 14px 14px 14px;
-  }
-
-  /* Environment block */
-  .env-block {
-    background: var(--bg-1);
-    border: 1px solid var(--line);
-    border-radius: 8px;
-  }
-  .env-head {
+  .modal-head {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 11px 16px;
+    padding: 14px 20px;
     border-bottom: 1px solid var(--line);
-    background: linear-gradient(180deg, #131820 0%, #11151a 100%);
   }
-  .env-name {
-    font-size: 12px; font-weight: 700; letter-spacing: 0.8px;
-    text-transform: uppercase;
+  .modal-title {
+    font: 700 14px 'JetBrains Mono', monospace;
+    color: var(--text); letter-spacing: 0.2px;
   }
-  .env-name .env-dot {
-    display: inline-block; width: 7px; height: 7px;
-    border-radius: 50%; margin-right: 7px;
-    background: var(--green);
+  .modal-title .sep { color: var(--text-mute); margin: 0 2px; }
+  .modal-close {
+    background: transparent; border: 0;
+    color: var(--text-dim); font-size: 22px; cursor: pointer;
+    padding: 0 6px; line-height: 1;
   }
-  .env-name.unhealthy .env-dot { background: var(--red); }
-  .env-meta {
-    font: 600 10.5px 'JetBrains Mono', monospace;
-    color: var(--text-mute);
-  }
+  .modal-close:hover { color: var(--text); }
 
-  /* Section header inside an env block */
-  .section-head {
-    padding: 10px 16px 6px 16px;
-    font: 600 10.5px 'JetBrains Mono', monospace;
+  .modal-info {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--line);
+    display: flex; flex-wrap: wrap; gap: 14px 22px;
+    font: 500 12px 'JetBrains Mono', monospace;
     color: var(--text-dim);
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
   }
+  .modal-info .info-item b { color: var(--text); font-weight: 700; margin-left: 2px; }
+  .modal-current {
+    padding: 10px 20px; border-bottom: 1px solid var(--line);
+    font: 500 13px 'JetBrains Mono', monospace; color: var(--text-dim);
+  }
+  .modal-current b { color: var(--text); font-weight: 700; }
 
-  /* Panel — one chart */
-  .panel {
-    padding: 8px 12px 12px 12px;
-    border-top: 1px solid #1a1f27;
-  }
-  .panel:first-of-type { border-top: 0; }
-  .panel-head {
-    display: flex; align-items: baseline; justify-content: space-between;
-    gap: 12px; padding: 4px 4px 6px 4px;
-  }
-  .panel-title {
-    font-size: 12px; font-weight: 600; color: var(--text);
-  }
-  .panel-stats {
-    font: 500 10.5px 'JetBrains Mono', monospace;
-    color: var(--text-mute);
-  }
-  .panel-stats b { color: var(--text); font-weight: 600; }
-  .panel-svg {
-    width: 100%; height: 130px; display: block;
+  .modal-body { padding: 12px 20px 20px 20px; }
+
+  .chart-card {
     background: var(--bg-2);
     border: 1px solid var(--line);
-    border-radius: 4px;
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-bottom: 14px;
   }
-  .panel-empty {
-    height: 130px;
-    background: var(--bg-2);
+  .chart-card-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; margin-bottom: 8px; flex-wrap: wrap;
+  }
+  .chart-card-title {
+    font: 600 11px 'JetBrains Mono', monospace;
+    color: var(--text-dim);
+    letter-spacing: 0.7px;
+    text-transform: uppercase;
+  }
+  .chart-card-title .current {
+    color: var(--text); margin-left: 8px; letter-spacing: 0.3px;
+  }
+  .chart-card-title .current b { font-weight: 700; }
+  .chart-range {
+    display: inline-flex;
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    overflow: hidden;
+  }
+  .chart-range button {
+    background: transparent;
+    color: var(--text-dim);
+    border: 0;
+    border-right: 1px solid var(--line);
+    padding: 4px 9px;
+    font: 600 10.5px 'JetBrains Mono', monospace;
+    cursor: pointer;
+    letter-spacing: 0.3px;
+  }
+  .chart-range button:last-child { border-right: 0; }
+  .chart-range button:hover { color: var(--text); }
+  .chart-range button.active {
+    background: #1a2330; color: var(--blue);
+    box-shadow: inset 0 -2px 0 var(--blue);
+  }
+  .chart-svg {
+    width: 100%; height: 220px; display: block;
+    background: transparent;
+  }
+  .chart-loading, .chart-empty {
+    height: 220px;
+    display: grid; place-items: center;
+    color: var(--text-mute); font-size: 12px;
+    background: var(--bg-1);
     border: 1px dashed var(--line);
     border-radius: 4px;
-    display: grid; place-items: center;
-    color: var(--text-mute); font-size: 11.5px;
   }
-  .panel-loading {
-    height: 130px;
-    background: var(--bg-2);
-    border: 1px solid var(--line);
-    border-radius: 4px;
-    display: grid; place-items: center;
-    color: var(--text-mute); font-size: 11.5px; font-style: italic;
-  }
-  .panel-error {
-    color: var(--red); font-size: 11px;
-    padding: 4px 6px;
-  }
-  .panel-legend {
-    margin-top: 6px;
-    font: 500 10.5px 'JetBrains Mono', monospace;
-    color: var(--text-mute);
-    display: flex; align-items: center; gap: 6px;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-  .panel-legend .swatch {
-    display: inline-block; width: 8px; height: 8px; border-radius: 2px;
-    flex-shrink: 0;
-  }
+  .chart-empty { font-style: italic; }
 
   /* Right column: live alert feed */
   .panel-right {
@@ -735,7 +700,6 @@
       </div>
       <div class="loading" style="padding:24px;background:var(--bg-1);border:1px solid var(--line);border-top:0;border-radius:0 0 8px 8px;">Loading jobs…</div>
     </div>
-    <div id="detail-view" style="display:none;"></div>
   </div>
 
   <div class="panel-right">
@@ -744,6 +708,20 @@
       <div class="panel-right-meta" id="feed-count">0 alerts</div>
     </div>
     <div class="feed" id="feed"><div class="empty-state">No alerts yet — system is monitoring.</div></div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="job-modal-backdrop">
+  <div class="modal" id="job-modal" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <span class="modal-title" id="modal-title">--</span>
+      <button class="modal-close" id="modal-close" aria-label="Close">×</button>
+    </div>
+    <div class="modal-info" id="modal-info">--</div>
+    <div class="modal-current" id="modal-current">Current lag (max of both): --</div>
+    <div class="modal-body" id="modal-body">
+      <div class="chart-loading">Loading…</div>
+    </div>
   </div>
 </div>
 
@@ -816,6 +794,7 @@ const STATE = {
   jobs: [],            // [{topic, consumer_group, team, channel, environment, job_id}]
   jobs_by_id: {},      // job_id -> job
   job_state: {},       // job_id -> { lag, status, sparkline: [..numbers..] }
+  summary: {},         // last /api/status summary (incl. threshold for modal)
   view: 'grid',        // 'grid' | 'detail'
   selected_job_idx: 0,
   range_minutes: 720,  // default 12h to match Grafana
@@ -1059,99 +1038,118 @@ async function reloadAllSparklines() {
 }
 
 // =============================================================================
-// Detail view (4-panel chart grid for one job)
+// Job detail modal (Grafana-style charts with threshold + breach fill)
 // =============================================================================
+const MODAL_RANGES = [
+  { key: '30m', minutes: 30 },
+  { key: '6h',  minutes: 360 },
+  { key: '24h', minutes: 1440 },
+  { key: '7d',  minutes: 10080 },
+  { key: '30d', minutes: 43200 },
+  { key: '6mo', minutes: 259200 },
+];
+const DEFAULT_MODAL_MINUTES = 30;
+// Per-panel range state lives only while the modal is open.
+let MODAL_PANEL_MINUTES = {};
+const MODAL_BACKDROP = document.getElementById('job-modal-backdrop');
+const MODAL_CLOSE = document.getElementById('modal-close');
+
 function openDetailView() {
   STATE.view = 'detail';
-  document.getElementById('team-grid').style.display = 'none';
-  document.getElementById('detail-view').style.display = '';
-  renderDetailView();
+  // Default each panel to 30m; user can change per-chart from the inline range bar
+  MODAL_PANEL_MINUTES = {};
+  for (const p of STATE.panels) MODAL_PANEL_MINUTES[p.id] = DEFAULT_MODAL_MINUTES;
+  renderDetailModal();
+  MODAL_BACKDROP.classList.add('open');
+  document.body.style.overflow = 'hidden';
   reloadAllPanels();
 }
 
 function closeDetailView() {
   STATE.view = 'grid';
-  document.getElementById('detail-view').style.display = 'none';
-  document.getElementById('team-grid').style.display = '';
+  MODAL_BACKDROP.classList.remove('open');
+  document.body.style.overflow = '';
   reloadAllSparklines();
 }
 
-function renderDetailView() {
-  const root = document.getElementById('detail-view');
+MODAL_CLOSE.addEventListener('click', closeDetailView);
+MODAL_BACKDROP.addEventListener('click', (ev) => {
+  if (ev.target === MODAL_BACKDROP) closeDetailView();
+});
+document.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Escape' && STATE.view === 'detail') closeDetailView();
+});
+
+function renderDetailModal() {
   const job = STATE.jobs[STATE.selected_job_idx];
-  if (!job || !STATE.panels.length) {
-    root.innerHTML = `<button class="detail-back" id="detail-back-btn">← Back to all jobs</button><div class="loading">No data source configured.</div>`;
-    document.getElementById('detail-back-btn').addEventListener('click', closeDetailView);
-    return;
-  }
+  if (!job) return;
+  const threshold = (STATE.summary && STATE.summary.threshold) || 0;
+  document.getElementById('modal-title').innerHTML =
+    `${job.topic}<span class="sep">::</span>${job.environment.toLowerCase()}`;
+  document.getElementById('modal-info').innerHTML = `
+    <span class="info-item">${job.team || '--'} · ${job.channel || '--'}</span>
+    <span class="info-item">Consumer group:<b>${job.consumer_group}</b></span>
+    <span class="info-item">Environment:<b>${job.environment.toUpperCase()}</b></span>
+    <span class="info-item">Threshold:<b>${_fmtMmsgs(threshold)}M</b></span>
+  `;
+  // Current lag will be filled in once data arrives; show last known status now
+  const st = STATE.job_state[job.job_id] || {};
+  document.getElementById('modal-current').innerHTML =
+    `Current lag (max of both): <b>${_fmtMmsgs(st.lag || 0)}M</b>`;
 
-  const st = STATE.job_state[job.job_id] || { status: 'ok' };
-  const status = st.status === 'breach' ? 'breach' : 'ok';
-  const statusLabel = status === 'breach' ? '▲ BREACH' : '✓ HEALTHY';
-
-  let panelsHtml = '';
+  // Render one chart-card per panel
+  const body = document.getElementById('modal-body');
+  let html = '';
   for (const p of STATE.panels) {
-    const slotId = `panel-${p.id}`;
-    panelsHtml += `
-      <div class="panel-card" id="${slotId}">
-        <div class="panel-head">
-          <div class="panel-title">${p.title}</div>
-          <div class="panel-stats" id="${slotId}-stats">--</div>
+    const minutes = MODAL_PANEL_MINUTES[p.id] || DEFAULT_MODAL_MINUTES;
+    let rangeHtml = '';
+    for (const r of MODAL_RANGES) {
+      const active = r.minutes === minutes ? ' active' : '';
+      rangeHtml += `<button class="${active.trim()}" data-panel="${p.id}" data-minutes="${r.minutes}">${r.key}</button>`;
+    }
+    html += `
+      <div class="chart-card" id="chart-card-${p.id}">
+        <div class="chart-card-head">
+          <span class="chart-card-title">
+            ${p.title.toUpperCase()}
+            <span class="current" id="chart-current-${p.id}"></span>
+          </span>
+          <span class="chart-range">${rangeHtml}</span>
         </div>
-        <div class="panel-loading">Loading…</div>
-        <div class="panel-legend">
-          <span class="swatch" style="background:${p.color}"></span>
-          <span>${p.title}</span>
-        </div>
+        <div class="chart-loading">Loading…</div>
       </div>
     `;
   }
-
-  root.innerHTML = `
-    <button class="detail-back" id="detail-back-btn">← Back to all jobs</button>
-    <div class="job-view-head">
-      <div class="field">
-        <span class="field-label">Topic</span>
-        <span class="field-value">${job.topic}</span>
-      </div>
-      <div class="field">
-        <span class="field-label">Consumer Group</span>
-        <span class="field-value">${job.consumer_group}</span>
-      </div>
-      <div class="field">
-        <span class="field-label">Environment</span>
-        <span class="field-value">${job.environment.toUpperCase()}</span>
-      </div>
-      <div class="field">
-        <span class="field-label">Team</span>
-        <span class="field-value">${job.team || '--'}</span>
-      </div>
-      <div class="field">
-        <span class="field-label">Channel</span>
-        <span class="field-value">${job.channel || '--'}</span>
-      </div>
-      <span class="status-pill ${status}">${statusLabel}</span>
-    </div>
-    <div class="panel-grid">${panelsHtml}</div>
-  `;
-  document.getElementById('detail-back-btn').addEventListener('click', closeDetailView);
+  body.innerHTML = html;
+  body.querySelectorAll('.chart-range button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const pid = btn.dataset.panel;
+      const m = parseInt(btn.dataset.minutes, 10);
+      MODAL_PANEL_MINUTES[pid] = m;
+      // Toggle active class within this chart's range row
+      btn.parentNode.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const panel = STATE.panels.find(x => x.id === pid);
+      if (panel) loadPanel(panel, STATE.jobs[STATE.selected_job_idx], m);
+    });
+  });
 }
 
 async function reloadAllPanels() {
   const job = STATE.jobs[STATE.selected_job_idx];
   if (!job) return;
-  const minutes = STATE.range_minutes;
   for (const p of STATE.panels) {
-    loadPanel(p, job, minutes).catch(err => {
+    const m = MODAL_PANEL_MINUTES[p.id] || DEFAULT_MODAL_MINUTES;
+    loadPanel(p, job, m).catch(err => {
       console.error('panel load failed', p.id, job.job_id, err);
     });
   }
 }
 
 async function loadPanel(panel, job, minutes) {
-  const slot = document.getElementById(`panel-${panel.id}`);
+  const slot = document.getElementById(`chart-card-${panel.id}`);
   if (!slot) return;
-  const statsEl = document.getElementById(`panel-${panel.id}-stats`);
+  const currentEl = document.getElementById(`chart-current-${panel.id}`);
 
   const params = new URLSearchParams();
   params.set('minutes', minutes);
@@ -1159,54 +1157,48 @@ async function loadPanel(panel, job, minutes) {
   if (panel.scope.includes('topic')) params.set('topic', job.topic);
   if (panel.scope.includes('consumer_group')) params.set('consumer_group', job.consumer_group);
 
-  // Replace the inner content with a loading placeholder while we fetch
-  const placeholder = slot.querySelector('.panel-loading, .panel-svg, .panel-empty, .panel-error');
-  if (placeholder) placeholder.outerHTML = `<div class="panel-loading">Loading…</div>`;
+  // Replace any chart inside the slot with a loading placeholder while we fetch
+  const placeholder = slot.querySelector('.chart-loading, .chart-svg, .chart-empty');
+  if (placeholder) placeholder.outerHTML = `<div class="chart-loading">Loading…</div>`;
+  if (currentEl) currentEl.innerHTML = '';
 
   let data;
   try {
     data = await api(`/api/panel/${panel.id}/range?${params.toString()}`);
   } catch (e) {
-    const ph = slot.querySelector('.panel-loading, .panel-svg, .panel-empty');
-    if (ph) ph.outerHTML = `<div class="panel-empty">Error: ${e.message}</div>`;
-    if (statsEl) statsEl.textContent = '--';
+    const ph = slot.querySelector('.chart-loading, .chart-svg, .chart-empty');
+    if (ph) ph.outerHTML = `<div class="chart-empty">Error: ${e.message}</div>`;
     return;
   }
 
   const points = data.points || [];
-
-  // Update stats line (Mean · Last · Max · Min)
-  if (statsEl) {
-    if (!points.length) {
-      statsEl.innerHTML = '<span style="color:var(--text-mute)">No data</span>';
+  if (currentEl) {
+    if (points.length) {
+      const last = points[points.length - 1].value;
+      currentEl.innerHTML = `CURRENT <b>${FMT_K(last)}</b>`;
     } else {
-      const values = points.map(p => p.value);
-      const mean = values.reduce((a,b) => a+b, 0) / values.length;
-      const last = values[values.length - 1];
-      const max = Math.max(...values);
-      const min = Math.min(...values);
-      statsEl.innerHTML = `Mean <b>${FMT_K(mean)}</b> · Last <b>${FMT_K(last)}</b> · Max <b>${FMT_K(max)}</b> · Min <b>${FMT_K(min)}</b>`;
+      currentEl.innerHTML = '<span style="color:var(--text-mute)">no data</span>';
     }
   }
 
-  // Render chart
-  const ph2 = slot.querySelector('.panel-loading, .panel-svg, .panel-empty');
+  const ph2 = slot.querySelector('.chart-loading, .chart-svg, .chart-empty');
   if (!points.length) {
-    if (ph2) ph2.outerHTML = `<div class="panel-empty">No data for this range</div>`;
+    if (ph2) ph2.outerHTML = `<div class="chart-empty">No data for this range</div>`;
     return;
   }
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.classList.add('panel-svg');
+  svg.classList.add('chart-svg');
   svg.setAttribute('preserveAspectRatio', 'none');
   if (ph2) ph2.replaceWith(svg);
-  drawChart(svg, points, panel);
+  drawChart(svg, points, data);
 }
 
 // =============================================================================
-// Grafana-style spike chart
+// Grafana-style chart with threshold + breach fill + current-value callout
+// (Used inside the detail modal. `data` is the full /api/panel/X/range payload.)
 // =============================================================================
-function drawChart(svg, points, panel) {
-  const W = 800, H = 130, padL = 50, padR = 8, padT = 6, padB = 22;
+function drawChart(svg, points, data) {
+  const W = 880, H = 220, padL = 56, padR = 16, padT = 10, padB = 36;
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
   svg.innerHTML = '';
 
@@ -1214,39 +1206,40 @@ function drawChart(svg, points, panel) {
   const valArr = points.map(p => p.value);
   const tMin = tsArr[0], tMax = tsArr[tsArr.length - 1];
   const tSpan = Math.max(1, tMax - tMin);
+  const showThr = !!data.show_threshold && typeof data.threshold === 'number';
+  const thr = data.threshold || 0;
+
   let dataMax = Math.max(...valArr);
   let dataMin = Math.min(...valArr);
-  if (panel.y_min !== null && panel.y_min !== undefined) dataMin = Math.min(dataMin, panel.y_min);
-  if (panel.y_max !== null && panel.y_max !== undefined) dataMax = Math.max(dataMax, panel.y_max);
+  if (data.y_min != null) dataMin = Math.min(dataMin, data.y_min);
+  if (data.y_max != null) dataMax = Math.max(dataMax, data.y_max);
+  // Pad max so the threshold line + a little headroom are visible
+  if (showThr) dataMax = Math.max(dataMax, thr * 1.4);
   if (dataMax === dataMin) dataMax = dataMin + 1;
-  const yMin = panel.y_min !== null && panel.y_min !== undefined ? panel.y_min : Math.max(0, dataMin);
-  const yMax = panel.y_max !== null && panel.y_max !== undefined ? panel.y_max : dataMax * 1.1;
+  const yMin = data.y_min != null ? data.y_min : Math.max(0, dataMin);
+  const yMax = data.y_max != null ? data.y_max : dataMax * 1.05;
   const yRange = Math.max(0.0001, yMax - yMin);
 
   const innerW = W - padL - padR;
   const innerH = H - padT - padB;
   const xOf = (t) => padL + ((t - tMin) / tSpan) * innerW;
   const yOf = (v) => padT + (1 - (v - yMin) / yRange) * innerH;
+  const baselineY = yOf(yMin);
 
-  // y-axis ticks (5)
+  // Y-axis grid + labels (in M for big numbers)
   const niceStep = _niceStep(yRange);
-  const ticks = [];
-  for (let v = Math.ceil(yMin / niceStep) * niceStep; v <= yMax + 0.0001; v += niceStep) {
-    ticks.push(v);
-  }
   let yAxis = '';
-  for (const v of ticks) {
+  for (let v = Math.ceil(yMin / niceStep) * niceStep; v <= yMax + 0.0001; v += niceStep) {
     const y = yOf(v);
     yAxis += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${padL+innerW}" y2="${y.toFixed(1)}" stroke="#1a1f27" stroke-width="0.5" />`;
     yAxis += `<text x="${padL-6}" y="${(y+3.5).toFixed(1)}" fill="#8b949e" font-size="9.5" font-family="JetBrains Mono,monospace" text-anchor="end">${FMT_K(v)}</text>`;
   }
 
-  // x-axis: grid line at every step boundary; labels skipped where they'd visually
-  // collide (so 30-min spacing renders even when fewer labels can fit).
+  // X-axis: 30-min spacing for ≤24h windows; labels skipped if they'd collide
   const stepSec = _chooseTimeStep(tSpan);
   const istOffsetSec = IST_OFFSET_MIN * 60;
   const firstTickIst = Math.ceil((tMin + istOffsetSec) / stepSec) * stepSec;
-  const minLabelPx = 48;     // viewBox-units between labels before we skip
+  const minLabelPx = 56;
   let xAxis = '';
   let lastLabelX = -Infinity;
   for (let tIst = firstTickIst; tIst <= tMax + istOffsetSec; tIst += stepSec) {
@@ -1257,20 +1250,78 @@ function drawChart(svg, points, panel) {
     if (x - lastLabelX >= minLabelPx) {
       const d = new Date(t * 1000);
       const label = stepSec >= 86400 ? fmtDateIST(d) : fmtClockIST(d);
-      xAxis += `<text x="${x.toFixed(1)}" y="${(padT+innerH+13).toFixed(1)}" fill="#8b949e" font-size="9.5" font-family="JetBrains Mono,monospace" text-anchor="middle">${label}</text>`;
+      xAxis += `<text x="${x.toFixed(1)}" y="${(padT+innerH+14).toFixed(1)}" fill="#8b949e" font-size="9.5" font-family="JetBrains Mono,monospace" text-anchor="middle">${label}</text>`;
       lastLabelX = x;
     }
   }
 
-  // Clean line chart (no baseline spikes).
-  const path = points.map((p, i) =>
+  // Build the line path
+  const linePath = points.map((p, i) =>
     (i ? 'L' : 'M') + xOf(p.ts).toFixed(1) + ',' + yOf(p.value).toFixed(1)
   ).join('');
+
+  // Breach fill: red area between line and threshold, only above threshold.
+  // Implementation: render the data as a closed area (line down to baseline),
+  // filled red, then clip to the rectangle ABOVE the threshold line.
+  let breachFill = '';
+  let thresholdLine = '';
+  if (showThr) {
+    const thrY = yOf(thr);
+    const lineColor = data.color || '#58a6ff';
+    const areaPath = linePath +
+      `L${xOf(tMax).toFixed(1)},${baselineY.toFixed(1)}` +
+      `L${xOf(tMin).toFixed(1)},${baselineY.toFixed(1)}Z`;
+    const clipId = `breach-clip-${Math.random().toString(36).slice(2, 8)}`;
+    breachFill = `
+      <defs>
+        <clipPath id="${clipId}">
+          <rect x="${padL}" y="${padT}" width="${innerW}" height="${(thrY - padT).toFixed(1)}" />
+        </clipPath>
+      </defs>
+      <path d="${areaPath}" fill="rgba(248,81,73,0.55)" clip-path="url(#${clipId})" />
+    `;
+    thresholdLine = `
+      <line x1="${padL}" y1="${thrY.toFixed(1)}" x2="${padL+innerW}" y2="${thrY.toFixed(1)}"
+            stroke="#f85149" stroke-width="1" stroke-dasharray="5,4" opacity="0.85" />
+      <g transform="translate(${(padL+innerW-90).toFixed(1)}, ${(thrY-9).toFixed(1)})">
+        <rect width="86" height="16" rx="2" fill="#3a1a1a" stroke="#6d2c2c" />
+        <text x="43" y="11.5" fill="#f85149" font-size="10" font-family="JetBrains Mono,monospace" text-anchor="middle" font-weight="700">threshold ${FMT_K(thr)}</text>
+      </g>
+    `;
+  }
+
+  // Current-value callout near the rightmost point: "X.XXM @ HH:MM"
+  const lastT = tsArr[tsArr.length - 1];
+  const lastV = valArr[valArr.length - 1];
+  const lastX = xOf(lastT);
+  const lastY = yOf(lastV);
+  const calloutLabel = `${FMT_K(lastV)} @ ${fmtClockIST(new Date(lastT * 1000))}`;
+  const calloutW = Math.max(78, calloutLabel.length * 6 + 10);
+  let calloutX = lastX - calloutW - 6;
+  if (calloutX < padL + 4) calloutX = lastX + 6;
+  const calloutY = Math.max(padT + 6, Math.min(padT + innerH - 22, lastY + 8));
+  const callout = `
+    <circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="2.5" fill="${data.color || '#58a6ff'}" />
+    <g transform="translate(${calloutX.toFixed(1)}, ${calloutY.toFixed(1)})">
+      <rect width="${calloutW}" height="16" rx="2" fill="#0e1218" stroke="#2e3742" />
+      <text x="${calloutW/2}" y="11.5" fill="#e6edf3" font-size="9.5" font-family="JetBrains Mono,monospace" text-anchor="middle" font-weight="600">${calloutLabel}</text>
+    </g>
+  `;
+
+  // Axis labels
+  const axisLabels = `
+    <text x="14" y="${(padT+innerH/2).toFixed(1)}" fill="#8b949e" font-size="10.5" font-family="JetBrains Mono,monospace" text-anchor="middle" transform="rotate(-90, 14, ${(padT+innerH/2).toFixed(1)})">Lag</text>
+    <text x="${(padL+innerW/2).toFixed(1)}" y="${(padT+innerH+30).toFixed(1)}" fill="#8b949e" font-size="10.5" font-family="JetBrains Mono,monospace" text-anchor="middle">Time (IST)</text>
+  `;
 
   svg.innerHTML = `
     ${yAxis}
     ${xAxis}
-    <path d="${path}" fill="none" stroke="${panel.color}" stroke-width="1.5" stroke-linejoin="round" />
+    ${breachFill}
+    ${thresholdLine}
+    <path d="${linePath}" fill="none" stroke="${data.color || '#58a6ff'}" stroke-width="1.5" stroke-linejoin="round" />
+    ${callout}
+    ${axisLabels}
   `;
 }
 
@@ -1293,6 +1344,7 @@ function _niceStep(range, targetTicks = 4) {
 async function refreshStatus() {
   try {
     const data = await api('/api/status');
+    STATE.summary = data.summary || {};
     document.getElementById('stat-monitored').textContent = data.summary.monitored;
     document.getElementById('stat-breaching').textContent = data.summary.breaching;
     document.getElementById('stat-healthy').textContent = data.summary.healthy;
@@ -1337,12 +1389,12 @@ async function refreshStatus() {
         }
       }
     } else if (STATE.view === 'detail') {
-      const head = document.querySelector('#detail-view .status-pill');
-      if (head) {
-        const job = STATE.jobs[STATE.selected_job_idx];
-        const s = (STATE.job_state[job.job_id] || {}).status === 'breach' ? 'breach' : 'ok';
-        head.className = `status-pill ${s}`;
-        head.textContent = s === 'breach' ? '▲ BREACH' : '✓ HEALTHY';
+      // Modal stays open — refresh the live "current lag" line on top
+      const job = STATE.jobs[STATE.selected_job_idx];
+      const cur = document.getElementById('modal-current');
+      if (cur && job) {
+        const lag = (STATE.job_state[job.job_id] || {}).lag || 0;
+        cur.innerHTML = `Current lag (max of both): <b>${_fmtMmsgs(lag)}M</b>`;
       }
     }
   } catch (e) {

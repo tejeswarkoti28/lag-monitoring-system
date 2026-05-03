@@ -28,6 +28,7 @@ class Panel:
     y_min: Optional[float] = None
     y_max: Optional[float] = None
     color: str = "#84d957"
+    show_threshold: bool = False
     description: str = ""
 
     def build_query(

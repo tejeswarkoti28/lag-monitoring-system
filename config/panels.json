@@ -1,7 +1,33 @@
 {
-  "_comment": "Panel registry. Each panel mirrors a Grafana panel from the 'Lenses ConsumerGroup Lag' dashboard (UID o7eRAUOpwerz3). To add a new panel, append an entry with a unique id; the dashboard will render it automatically inside the named section. Variables in 'expr' starting with $ are substituted from the data source's static_labels OR from the per-request scope (env, topic, consumer_group).",
+  "_comment": "Panel registry. Each panel mirrors a Grafana panel from the 'Lenses ConsumerGroup Lag' dashboard (UID o7eRAUOpwerz3). To add a new panel, append an entry with a unique id; the dashboard will render it automatically inside the named section. Variables in 'expr' starting with $ are substituted from the data source's static_labels OR from the per-request scope (env, topic, consumer_group). The 'show_threshold' flag adds the breach-threshold dashed line + red fill above it on the chart.",
 
   "panels": [
+    {
+      "id": "consumer_group_lag",
+      "title": "Consumer Group Lag",
+      "section": "consumer_metrics",
+      "data_source": "production",
+      "expr": "max(lenses_topic_consumer_lag{job=\"$job\",ooa=\"$ooa\",oop=\"$oop\",ooe=\"$env\",topic=\"$topic\",consumerGroup=\"$consumer_group\"})",
+      "scope": ["env", "topic", "consumer_group"],
+      "unit": "short",
+      "y_min": 0,
+      "color": "#58a6ff",
+      "show_threshold": true,
+      "description": "Worst-partition lag — the slowest partition's lag. Drives the breach decision."
+    },
+    {
+      "id": "consumer_group_topic_lag",
+      "title": "Consumer Group / Topic Lag",
+      "section": "consumer_metrics",
+      "data_source": "production",
+      "expr": "sum(lenses_topic_consumer_lag{job=\"$job\",ooa=\"$ooa\",oop=\"$oop\",ooe=\"$env\",topic=\"$topic\",consumerGroup=\"$consumer_group\"})",
+      "scope": ["env", "topic", "consumer_group"],
+      "unit": "short",
+      "y_min": 0,
+      "color": "#58a6ff",
+      "show_threshold": true,
+      "description": "Sum of lag across all partitions of the topic for this consumer group."
+    },
     {
       "id": "lenses_status",
       "title": "Lenses Status",
@@ -13,31 +39,8 @@
       "y_min": 0,
       "y_max": 2,
       "color": "#84d957",
+      "show_threshold": false,
       "description": "Binary up/down indicator. 1 = the Lenses exporter is healthy, 0 = it is unreachable."
-    },
-    {
-      "id": "consumer_group_topic_lag",
-      "title": "Consumer Group / Topic Lag",
-      "section": "consumer_metrics",
-      "data_source": "production",
-      "expr": "sum(lenses_topic_consumer_lag{job=\"$job\",ooa=\"$ooa\",oop=\"$oop\",ooe=\"$env\",topic=\"$topic\",consumerGroup=\"$consumer_group\"})",
-      "scope": ["env", "topic", "consumer_group"],
-      "unit": "short",
-      "y_min": 0,
-      "color": "#84d957",
-      "description": "Sum of lag across all partitions of the topic for this consumer group."
-    },
-    {
-      "id": "consumer_group_lag",
-      "title": "Consumer Group Lag",
-      "section": "consumer_metrics",
-      "data_source": "production",
-      "expr": "max(lenses_topic_consumer_lag{job=\"$job\",ooa=\"$ooa\",oop=\"$oop\",ooe=\"$env\",topic=\"$topic\",consumerGroup=\"$consumer_group\"})",
-      "scope": ["env", "topic", "consumer_group"],
-      "unit": "short",
-      "y_min": 0,
-      "color": "#84d957",
-      "description": "Worst-partition lag — the slowest partition's lag. Drives the breach decision."
     },
     {
       "id": "rebalancing_inactive_status",
@@ -50,6 +53,7 @@
       "y_min": 0,
       "y_max": 1,
       "color": "#f0883e",
+      "show_threshold": false,
       "description": "Returns 1 if the metric has no data (consumer rebalancing or inactive); empty otherwise."
     }
   ]

@@ -26,6 +26,7 @@ def load_panels(config_path: Path) -> list[Panel]:
             y_min=entry.get("y_min"),
             y_max=entry.get("y_max"),
             color=entry.get("color", "#84d957"),
+            show_threshold=bool(entry.get("show_threshold", False)),
             description=entry.get("description", ""),
         ))
     return panels
@@ -65,6 +66,7 @@ class PanelRegistry:
                 "y_min": p.y_min,
                 "y_max": p.y_max,
                 "color": p.color,
+                "show_threshold": p.show_threshold,
                 "description": p.description,
             }
             for p in self._panels

@@ -958,6 +958,8 @@ def panel_range(
         "y_min": panel.y_min,
         "y_max": panel.y_max,
         "color": panel.color,
+        "show_threshold": panel.show_threshold,
+        "threshold": THRESHOLD_MESSAGES,
         "points": [
             {"ts": ts, "value": v} for ts, v in series
         ],
