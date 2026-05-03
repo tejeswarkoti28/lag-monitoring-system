@@ -170,7 +170,52 @@
     box-shadow: inset 0 -2px 0 var(--blue);
   }
 
-  /* Main layout: env columns on left, alert feed on right */
+  /* Per-job tabs */
+  .tabs-row {
+    padding: 12px 22px 0 22px;
+    display: flex; align-items: stretch; gap: 0;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--line);
+  }
+  .tabs-row::-webkit-scrollbar { height: 6px; }
+  .tabs-row::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 3px; }
+  .job-tab {
+    background: transparent;
+    border: 1px solid var(--line);
+    border-bottom: 0;
+    color: var(--text-dim);
+    padding: 9px 14px 10px 14px;
+    cursor: pointer;
+    border-radius: 6px 6px 0 0;
+    font: 600 11.5px 'JetBrains Mono', monospace;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    margin-right: 4px;
+    margin-bottom: -1px;
+    transition: color 0.12s, background 0.12s, border-color 0.12s;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .job-tab:hover { color: var(--text); background: var(--bg-2); }
+  .job-tab.active {
+    background: var(--bg-1);
+    border-color: var(--line);
+    color: var(--text);
+    box-shadow: inset 0 2px 0 var(--blue);
+  }
+  .job-tab .env-chip {
+    display: inline-block;
+    font-size: 9.5px; font-weight: 700;
+    padding: 1px 5px; border-radius: 3px;
+    background: var(--bg-3); color: var(--text-dim);
+    letter-spacing: 0.5px;
+  }
+  .job-tab.active .env-chip { background: var(--blue); color: white; }
+  .job-tab.breach { border-color: #6d2c2c; }
+  .job-tab.breach::before {
+    content: '▲'; color: var(--red); font-size: 9px;
+  }
+
+  /* Main layout: job view on left, alert feed on right */
   .main {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 380px;
@@ -181,13 +226,46 @@
     .stats { grid-template-columns: repeat(2, 1fr); }
   }
 
-  .env-grid {
+  .job-view-head {
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    display: flex; gap: 18px; flex-wrap: wrap; align-items: center;
+  }
+  .job-view-head .field {
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .job-view-head .field-label {
+    font: 600 9.5px 'JetBrains Mono', monospace;
+    color: var(--text-mute); letter-spacing: 0.6px; text-transform: uppercase;
+  }
+  .job-view-head .field-value {
+    font: 500 12px 'JetBrains Mono', monospace; color: var(--text);
+  }
+  .job-view-head .status-pill {
+    margin-left: auto;
+    padding: 4px 10px; border-radius: 4px;
+    font: 700 10.5px 'JetBrains Mono', monospace;
+    letter-spacing: 0.5px;
+  }
+  .status-pill.ok { background: var(--green-soft); color: var(--green); border: 1px solid #2c5d39; }
+  .status-pill.breach { background: var(--red-soft); color: var(--red); border: 1px solid #6d2c2c; }
+
+  .panel-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px;
   }
   @media (max-width: 1500px) {
-    .env-grid { grid-template-columns: 1fr; }
+    .panel-grid { grid-template-columns: 1fr; }
+  }
+  .panel-card {
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 14px 14px 14px;
   }
 
   /* Environment block */
@@ -548,15 +626,17 @@
 </div>
 
 <div class="controls">
-  <label for="topic-select">Topic</label>
-  <select id="topic-select"><option>Loading…</option></select>
   <label>Range</label>
   <div class="range-group" id="range-group" role="tablist"></div>
   <span class="indicator" style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;" id="last-poll">last poll: --</span>
 </div>
 
+<div class="tabs-row" id="job-tabs">
+  <div class="loading" style="padding:8px 0;">Loading jobs…</div>
+</div>
+
 <div class="main">
-  <div class="env-grid" id="env-grid">
+  <div id="job-view">
     <div class="loading">Loading panels…</div>
   </div>
 
@@ -635,7 +715,9 @@ const STATE = {
   topics: [],          // [{topic, consumer_group, team, channel}]
   environments: [],    // ['eus', 'scus']
   panels: [],          // panel definitions from /api/panels
-  selected_topic: null,
+  jobs: [],            // [{topic, consumer_group, team, channel, environment, job_id}]
+  selected_job_idx: 0,
+  job_status: {},      // { job_id: 'breach' | 'ok' }
   range_minutes: 720,  // default 12h to match Grafana
   poll_handle: null,
   seen_alert_ids: new Set(),
@@ -669,6 +751,30 @@ function fmtFullIST(d) {
   const date = i.getUTCFullYear() + '-' + String(i.getUTCMonth()+1).padStart(2,'0') + '-' + String(i.getUTCDate()).padStart(2,'0');
   return date + ' ' + fmtClockIST(d) + ':' + String(i.getUTCSeconds()).padStart(2,'0');
 }
+function fmtDateIST(d) {
+  const i = _toIST(d);
+  return String(i.getUTCMonth()+1).padStart(2,'0') + '-' + String(i.getUTCDate()).padStart(2,'0');
+}
+// Pick the smallest "nice" tick step (in seconds) that yields ≤ ~12 ticks across
+// the visible time span. Prefers 30 min for short ranges, scales up for wider ones.
+function _chooseTimeStep(spanSec) {
+  const STEPS = [
+    1800,    // 30 min
+    3600,    // 1 hour
+    7200,    // 2 hours
+    21600,   // 6 hours
+    43200,   // 12 hours
+    86400,   // 1 day
+    259200,  // 3 days
+    604800,  // 7 days
+    2592000, // 30 days
+  ];
+  const TARGET = 12;
+  for (const s of STEPS) {
+    if (spanSec / s <= TARGET) return s;
+  }
+  return STEPS[STEPS.length - 1];
+}
 function relTime(iso) {
   const d = new Date(iso);
   const s = Math.floor((Date.now() - d.getTime()) / 1000);
@@ -696,108 +802,132 @@ function renderRangeButtons() {
 }
 
 // =============================================================================
-// Topic dropdown
+// Per-job tabs (one per (topic, consumer_group) × env)
 // =============================================================================
-function renderTopicDropdown() {
-  const sel = document.getElementById('topic-select');
-  if (!STATE.topics.length) {
-    sel.innerHTML = '<option>(no topics in catalog)</option>';
-    sel.disabled = true;
+function _buildJobs() {
+  const out = [];
+  for (const t of STATE.topics) {
+    for (const env of STATE.environments) {
+      out.push({
+        topic: t.topic,
+        consumer_group: t.consumer_group,
+        team: t.team,
+        channel: t.channel,
+        environment: env,
+        job_id: `${t.topic}::${env}`,
+      });
+    }
+  }
+  return out;
+}
+
+function renderJobTabs() {
+  const root = document.getElementById('job-tabs');
+  if (!STATE.jobs.length) {
+    root.innerHTML = '<div class="loading" style="padding:8px 0;">(no jobs in catalog)</div>';
     return;
   }
-  const prev = STATE.selected_topic && STATE.selected_topic.topic;
-  sel.innerHTML = STATE.topics.map((t, i) =>
-    `<option value="${i}" ${t.topic === prev ? 'selected' : ''}>${t.topic} · ${t.consumer_group}</option>`
-  ).join('');
-  sel.disabled = false;
-  sel.onchange = () => {
-    const idx = parseInt(sel.value, 10);
-    STATE.selected_topic = STATE.topics[idx];
-    reloadAllPanels();
-  };
-  if (!STATE.selected_topic) STATE.selected_topic = STATE.topics[0];
+  root.innerHTML = STATE.jobs.map((j, i) => {
+    const active = i === STATE.selected_job_idx ? ' active' : '';
+    const breach = STATE.job_status[j.job_id] === 'breach' ? ' breach' : '';
+    return `
+      <button class="job-tab${active}${breach}" data-idx="${i}" title="${j.topic} · ${j.consumer_group}">
+        <span class="env-chip">${j.environment.toUpperCase()}</span>
+        <span class="topic">${j.topic}</span>
+      </button>
+    `;
+  }).join('');
+  root.querySelectorAll('.job-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      STATE.selected_job_idx = parseInt(btn.dataset.idx, 10);
+      renderJobTabs();
+      renderJobView();
+      reloadAllPanels();
+    });
+  });
 }
 
 // =============================================================================
-// Env grid + panel rendering
+// Single-job view (header + panel grid)
 // =============================================================================
-function renderEnvGrid() {
-  const root = document.getElementById('env-grid');
-  if (!STATE.environments.length || !STATE.panels.length) {
+function renderJobView() {
+  const root = document.getElementById('job-view');
+  const job = STATE.jobs[STATE.selected_job_idx];
+  if (!job || !STATE.panels.length) {
     root.innerHTML = `<div class="loading">No data source configured.</div>`;
     return;
   }
 
-  // Group panels by section, preserve definition order
-  const sections = {};
-  for (const p of STATE.panels) {
-    if (!sections[p.section]) sections[p.section] = [];
-    sections[p.section].push(p);
-  }
+  const status = STATE.job_status[job.job_id] === 'breach' ? 'breach' : 'ok';
+  const statusLabel = status === 'breach' ? '▲ BREACH' : '✓ HEALTHY';
 
-  let html = '';
-  for (const env of STATE.environments) {
-    const envUp = env.toUpperCase();
-    let sectionsHtml = '';
-    for (const sectionId of Object.keys(sections)) {
-      const sectionTitle = sectionId.replace(/_/g, ' ').toUpperCase();
-      let panelsHtml = '';
-      for (const p of sections[sectionId]) {
-        const slotId = `panel-${env}-${p.id}`;
-        panelsHtml += `
-          <div class="panel" id="${slotId}">
-            <div class="panel-head">
-              <div class="panel-title">${p.title}</div>
-              <div class="panel-stats" id="${slotId}-stats">--</div>
-            </div>
-            <div class="panel-loading">Loading…</div>
-            <div class="panel-legend">
-              <span class="swatch" style="background:${p.color}"></span>
-              <span>${p.title}</span>
-            </div>
-          </div>
-        `;
-      }
-      sectionsHtml += `
-        <div class="section-head">${sectionTitle}</div>
-        ${panelsHtml}
-      `;
-    }
-    html += `
-      <div class="env-block" data-env="${env}">
-        <div class="env-head">
-          <div class="env-name"><span class="env-dot"></span>Environment: ${envUp}</div>
-          <div class="env-meta" id="env-meta-${env}">--</div>
+  let panelsHtml = '';
+  for (const p of STATE.panels) {
+    const slotId = `panel-${p.id}`;
+    panelsHtml += `
+      <div class="panel-card" id="${slotId}">
+        <div class="panel-head">
+          <div class="panel-title">${p.title}</div>
+          <div class="panel-stats" id="${slotId}-stats">--</div>
         </div>
-        ${sectionsHtml}
+        <div class="panel-loading">Loading…</div>
+        <div class="panel-legend">
+          <span class="swatch" style="background:${p.color}"></span>
+          <span>${p.title}</span>
+        </div>
       </div>
     `;
   }
-  root.innerHTML = html;
+
+  root.innerHTML = `
+    <div class="job-view-head">
+      <div class="field">
+        <span class="field-label">Topic</span>
+        <span class="field-value">${job.topic}</span>
+      </div>
+      <div class="field">
+        <span class="field-label">Consumer Group</span>
+        <span class="field-value">${job.consumer_group}</span>
+      </div>
+      <div class="field">
+        <span class="field-label">Environment</span>
+        <span class="field-value">${job.environment.toUpperCase()}</span>
+      </div>
+      <div class="field">
+        <span class="field-label">Team</span>
+        <span class="field-value">${job.team || '--'}</span>
+      </div>
+      <div class="field">
+        <span class="field-label">Channel</span>
+        <span class="field-value">${job.channel || '--'}</span>
+      </div>
+      <span class="status-pill ${status}">${statusLabel}</span>
+    </div>
+    <div class="panel-grid">${panelsHtml}</div>
+  `;
 }
 
 async function reloadAllPanels() {
-  if (!STATE.selected_topic) return;
+  const job = STATE.jobs[STATE.selected_job_idx];
+  if (!job) return;
   const minutes = STATE.range_minutes;
-  for (const env of STATE.environments) {
-    for (const p of STATE.panels) {
-      loadPanel(p, env, minutes).catch(err => {
-        console.error('panel load failed', p.id, env, err);
-      });
-    }
+  for (const p of STATE.panels) {
+    loadPanel(p, job, minutes).catch(err => {
+      console.error('panel load failed', p.id, job.job_id, err);
+    });
   }
 }
 
-async function loadPanel(panel, env, minutes) {
-  const slot = document.getElementById(`panel-${env}-${panel.id}`);
+async function loadPanel(panel, job, minutes) {
+  const slot = document.getElementById(`panel-${panel.id}`);
   if (!slot) return;
-  const statsEl = document.getElementById(`panel-${env}-${panel.id}-stats`);
+  const statsEl = document.getElementById(`panel-${panel.id}-stats`);
 
   const params = new URLSearchParams();
   params.set('minutes', minutes);
-  if (panel.scope.includes('env')) params.set('env', env);
-  if (panel.scope.includes('topic')) params.set('topic', STATE.selected_topic.topic);
-  if (panel.scope.includes('consumer_group')) params.set('consumer_group', STATE.selected_topic.consumer_group);
+  if (panel.scope.includes('env')) params.set('env', job.environment);
+  if (panel.scope.includes('topic')) params.set('topic', job.topic);
+  if (panel.scope.includes('consumer_group')) params.set('consumer_group', job.consumer_group);
 
   // Replace the inner content with a loading placeholder while we fetch
   const placeholder = slot.querySelector('.panel-loading, .panel-svg, .panel-empty, .panel-error');
@@ -881,15 +1011,20 @@ function drawChart(svg, points, panel) {
     yAxis += `<text x="${padL-6}" y="${(y+3.5).toFixed(1)}" fill="#8b949e" font-size="9.5" font-family="JetBrains Mono,monospace" text-anchor="end">${FMT_K(v)}</text>`;
   }
 
-  // x-axis ticks (~6)
-  const xTickCount = Math.min(8, Math.max(3, Math.floor(innerW / 110)));
+  // x-axis ticks: prefer 30-min spacing; scale up automatically for wider ranges
+  const stepSec = _chooseTimeStep(tSpan);
+  // Snap first tick up to a step boundary in IST so labels land on round times
+  const istOffsetSec = IST_OFFSET_MIN * 60;
+  const firstTickIst = Math.ceil((tMin + istOffsetSec) / stepSec) * stepSec;
   let xAxis = '';
-  for (let i = 0; i <= xTickCount; i++) {
-    const t = tMin + (tSpan * i / xTickCount);
+  for (let tIst = firstTickIst; tIst <= tMax + istOffsetSec; tIst += stepSec) {
+    const t = tIst - istOffsetSec;
     const x = xOf(t);
+    if (x < padL - 1 || x > padL + innerW + 1) continue;
     xAxis += `<line x1="${x.toFixed(1)}" y1="${padT}" x2="${x.toFixed(1)}" y2="${padT+innerH}" stroke="#1a1f27" stroke-width="0.5" />`;
     const d = new Date(t * 1000);
-    xAxis += `<text x="${x.toFixed(1)}" y="${(padT+innerH+13).toFixed(1)}" fill="#8b949e" font-size="9.5" font-family="JetBrains Mono,monospace" text-anchor="middle">${fmtClockIST(d)}</text>`;
+    const label = stepSec >= 86400 ? fmtDateIST(d) : fmtClockIST(d);
+    xAxis += `<text x="${x.toFixed(1)}" y="${(padT+innerH+13).toFixed(1)}" fill="#8b949e" font-size="9.5" font-family="JetBrains Mono,monospace" text-anchor="middle">${label}</text>`;
   }
 
   // Spike-style line: vertical line for each point from baseline
@@ -943,6 +1078,23 @@ async function refreshStatus() {
         `last poll: ${relTime(data.summary.last_poll_at)}`;
     }
     updateSlackIndicator(data.summary.slack_configured);
+
+    // Update per-job breach indicator on tabs + the active job's status pill
+    const next = {};
+    for (const j of (data.jobs || [])) next[j.job_id] = j.status;
+    const changed = STATE.jobs.some(j => STATE.job_status[j.job_id] !== next[j.job_id]);
+    STATE.job_status = next;
+    if (changed) {
+      renderJobTabs();
+      // Refresh just the status pill on the current job header
+      const head = document.querySelector('#job-view .status-pill');
+      if (head) {
+        const job = STATE.jobs[STATE.selected_job_idx];
+        const s = STATE.job_status[job.job_id] === 'breach' ? 'breach' : 'ok';
+        head.className = `status-pill ${s}`;
+        head.textContent = s === 'breach' ? '▲ BREACH' : '✓ HEALTHY';
+      }
+    }
   } catch (e) {
     console.error('status fetch failed', e);
   }
@@ -1154,21 +1306,22 @@ async function boot() {
     STATE.topics = t.topics || [];
     STATE.environments = t.environments || [];
   } catch (e) {
-    document.getElementById('env-grid').innerHTML = `<div class="loading">Failed to load topics: ${e.message}</div>`;
+    document.getElementById('job-view').innerHTML = `<div class="loading">Failed to load topics: ${e.message}</div>`;
     return;
   }
   try {
     const p = await api('/api/panels');
     STATE.panels = p.panels || [];
   } catch (e) {
-    document.getElementById('env-grid').innerHTML = `<div class="loading">Failed to load panels: ${e.message}</div>`;
+    document.getElementById('job-view').innerHTML = `<div class="loading">Failed to load panels: ${e.message}</div>`;
     return;
   }
 
-  STATE.selected_topic = STATE.topics[0] || null;
-  renderTopicDropdown();
+  STATE.jobs = _buildJobs();
+  STATE.selected_job_idx = 0;
   renderRangeButtons();
-  renderEnvGrid();
+  renderJobTabs();
+  renderJobView();
   reloadAllPanels();
 
   // Background pollers
