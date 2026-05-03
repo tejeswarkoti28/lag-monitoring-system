@@ -44,7 +44,7 @@ class PrometheusDataSource(DataSource):
         auth_token: Optional[str] = None,
         static_labels: Optional[dict] = None,
         verify_ssl: bool = True,
-        timeout_seconds: float = 5.0,
+        timeout_seconds: float = 30.0,
     ) -> None:
         super().__init__(catalog=catalog, environments=environments)
         if not base_url:

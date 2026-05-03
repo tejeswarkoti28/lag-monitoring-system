@@ -6,6 +6,7 @@
     "url": "https://grafana.mms.walmart.net/api/datasources/proxy/uid/production",
     "auth": null,
     "verify_ssl": false,
+    "timeout_seconds": 30,
     "static_labels": {
       "job": "managed-kafka-consumer-service",
       "ooa": "kafka-v2-ca-shared-secure-prod",
