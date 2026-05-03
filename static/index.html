@@ -170,52 +170,7 @@
     box-shadow: inset 0 -2px 0 var(--blue);
   }
 
-  /* Per-job tabs */
-  .tabs-row {
-    padding: 12px 22px 0 22px;
-    display: flex; align-items: stretch; gap: 0;
-    overflow-x: auto;
-    border-bottom: 1px solid var(--line);
-  }
-  .tabs-row::-webkit-scrollbar { height: 6px; }
-  .tabs-row::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 3px; }
-  .job-tab {
-    background: transparent;
-    border: 1px solid var(--line);
-    border-bottom: 0;
-    color: var(--text-dim);
-    padding: 9px 14px 10px 14px;
-    cursor: pointer;
-    border-radius: 6px 6px 0 0;
-    font: 600 11.5px 'JetBrains Mono', monospace;
-    letter-spacing: 0.3px;
-    white-space: nowrap;
-    margin-right: 4px;
-    margin-bottom: -1px;
-    transition: color 0.12s, background 0.12s, border-color 0.12s;
-    display: inline-flex; align-items: center; gap: 8px;
-  }
-  .job-tab:hover { color: var(--text); background: var(--bg-2); }
-  .job-tab.active {
-    background: var(--bg-1);
-    border-color: var(--line);
-    color: var(--text);
-    box-shadow: inset 0 2px 0 var(--blue);
-  }
-  .job-tab .env-chip {
-    display: inline-block;
-    font-size: 9.5px; font-weight: 700;
-    padding: 1px 5px; border-radius: 3px;
-    background: var(--bg-3); color: var(--text-dim);
-    letter-spacing: 0.5px;
-  }
-  .job-tab.active .env-chip { background: var(--blue); color: white; }
-  .job-tab.breach { border-color: #6d2c2c; }
-  .job-tab.breach::before {
-    content: '▲'; color: var(--red); font-size: 9px;
-  }
-
-  /* Main layout: job view on left, alert feed on right */
+  /* Main layout: cards on left, alert feed on right */
   .main {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 380px;
@@ -225,6 +180,146 @@
     .main { grid-template-columns: 1fr; }
     .stats { grid-template-columns: repeat(2, 1fr); }
   }
+
+  /* Team-grouped card grid */
+  .grid-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-radius: 8px 8px 0 0;
+    padding: 12px 16px;
+    border-bottom: 0;
+  }
+  .grid-title { font-size: 13px; font-weight: 700; }
+  .grid-meta { font: 500 11px 'JetBrains Mono', monospace; color: var(--text-mute); }
+
+  .team-section {
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    border-top: 0;
+    padding: 14px 16px;
+  }
+  .team-section:last-child { border-radius: 0 0 8px 8px; }
+  .team-head {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 12px;
+  }
+  .team-name {
+    font: 700 12px 'JetBrains Mono', monospace;
+    letter-spacing: 0.7px;
+    color: var(--text);
+  }
+  .team-chip {
+    font: 600 10.5px 'JetBrains Mono', monospace;
+    color: var(--text-dim);
+    background: var(--bg-3);
+    border: 1px solid var(--line-2);
+    border-radius: 4px;
+    padding: 2px 7px;
+  }
+  .team-counts {
+    margin-left: auto;
+    font: 600 10.5px 'JetBrains Mono', monospace;
+    color: var(--text-mute);
+    display: flex; gap: 8px; align-items: center;
+  }
+  .team-counts .count {
+    padding: 2px 7px; border-radius: 3px; letter-spacing: 0.4px;
+  }
+  .team-counts .count.breach {
+    background: var(--bg-3); color: var(--text-dim); border: 1px solid var(--line-2);
+  }
+  .team-counts .count.breach.has {
+    background: var(--red-soft); color: var(--red); border: 1px solid #6d2c2c;
+  }
+  .team-counts .count.healthy {
+    background: var(--green-soft); color: var(--green); border: 1px solid #2c5d39;
+  }
+  .team-counts .sep { color: var(--text-mute); }
+
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+  }
+  @media (max-width: 1500px) { .cards-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (max-width: 1200px) { .cards-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 760px)  { .cards-grid { grid-template-columns: 1fr; } }
+
+  .job-card {
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 10px 12px 12px 12px;
+    cursor: pointer;
+    transition: border-color 0.12s, transform 0.08s;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .job-card:hover { border-color: var(--line-2); transform: translateY(-1px); }
+  .job-card.breach { border-color: #6d2c2c; }
+  .card-head {
+    display: flex; align-items: flex-start; gap: 8px; justify-content: space-between;
+  }
+  .card-title {
+    font: 600 12px 'JetBrains Mono', monospace;
+    color: var(--text);
+    overflow-wrap: anywhere;
+    line-height: 1.35;
+  }
+  .card-env {
+    font: 700 9.5px 'JetBrains Mono', monospace;
+    background: var(--bg-3); color: var(--text-dim);
+    border-radius: 3px; padding: 2px 6px;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+  }
+  .card-sub {
+    font: 500 10.5px 'JetBrains Mono', monospace;
+    color: var(--text-mute);
+  }
+  .card-spark {
+    width: 100%; height: 50px; display: block;
+  }
+  .card-spark-empty {
+    height: 50px;
+    background: var(--bg-1);
+    border: 1px dashed var(--line);
+    border-radius: 3px;
+    display: grid; place-items: center;
+    color: var(--text-mute); font-size: 10px; font-style: italic;
+  }
+  .card-foot {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 2px;
+  }
+  .card-value {
+    font: 600 14px 'JetBrains Mono', monospace;
+    color: var(--text);
+  }
+  .card-value-unit {
+    font: 500 10.5px 'JetBrains Mono', monospace;
+    color: var(--text-mute);
+    margin-left: 4px;
+  }
+  .card-pill {
+    font: 700 10px 'JetBrains Mono', monospace;
+    padding: 3px 8px; border-radius: 3px;
+    letter-spacing: 0.5px;
+  }
+  .card-pill.healthy { background: var(--green-soft); color: var(--green); border: 1px solid #2c5d39; }
+  .card-pill.breach { background: var(--red-soft); color: var(--red); border: 1px solid #6d2c2c; }
+
+  /* Detail view back button */
+  .detail-back {
+    background: var(--bg-2); color: var(--text-dim);
+    border: 1px solid var(--line);
+    padding: 7px 12px; border-radius: 5px;
+    font: 600 11.5px 'JetBrains Mono', monospace;
+    cursor: pointer;
+    margin-bottom: 12px;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .detail-back:hover { color: var(--text); border-color: var(--line-2); }
 
   .job-view-head {
     background: var(--bg-1);
@@ -631,13 +726,16 @@
   <span class="indicator" style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;" id="last-poll">last poll: --</span>
 </div>
 
-<div class="tabs-row" id="job-tabs">
-  <div class="loading" style="padding:8px 0;">Loading jobs…</div>
-</div>
-
 <div class="main">
-  <div id="job-view">
-    <div class="loading">Loading panels…</div>
+  <div id="main-content">
+    <div id="team-grid">
+      <div class="grid-head">
+        <span class="grid-title">Consumer-group jobs · live status</span>
+        <span class="grid-meta" id="grid-last-update">Last update: --</span>
+      </div>
+      <div class="loading" style="padding:24px;background:var(--bg-1);border:1px solid var(--line);border-top:0;border-radius:0 0 8px 8px;">Loading jobs…</div>
+    </div>
+    <div id="detail-view" style="display:none;"></div>
   </div>
 
   <div class="panel-right">
@@ -716,8 +814,10 @@ const STATE = {
   environments: [],    // ['eus', 'scus']
   panels: [],          // panel definitions from /api/panels
   jobs: [],            // [{topic, consumer_group, team, channel, environment, job_id}]
+  jobs_by_id: {},      // job_id -> job
+  job_state: {},       // job_id -> { lag, status, sparkline: [..numbers..] }
+  view: 'grid',        // 'grid' | 'detail'
   selected_job_idx: 0,
-  job_status: {},      // { job_id: 'breach' | 'ok' }
   range_minutes: 720,  // default 12h to match Grafana
   poll_handle: null,
   seen_alert_ids: new Set(),
@@ -755,25 +855,15 @@ function fmtDateIST(d) {
   const i = _toIST(d);
   return String(i.getUTCMonth()+1).padStart(2,'0') + '-' + String(i.getUTCDate()).padStart(2,'0');
 }
-// Pick the smallest "nice" tick step (in seconds) that yields ≤ ~12 ticks across
-// the visible time span. Prefers 30 min for short ranges, scales up for wider ones.
+// 30-min spacing for any range up to 24h; scales up for longer windows so
+// labels remain legible. Always called with the chart's actual visible span.
 function _chooseTimeStep(spanSec) {
-  const STEPS = [
-    1800,    // 30 min
-    3600,    // 1 hour
-    7200,    // 2 hours
-    21600,   // 6 hours
-    43200,   // 12 hours
-    86400,   // 1 day
-    259200,  // 3 days
-    604800,  // 7 days
-    2592000, // 30 days
-  ];
-  const TARGET = 12;
-  for (const s of STEPS) {
-    if (spanSec / s <= TARGET) return s;
-  }
-  return STEPS[STEPS.length - 1];
+  if (spanSec <= 24 * 3600)   return 1800;     // ≤24h → 30 min
+  if (spanSec <= 3 * 86400)   return 3600;     // ≤3d  → 1h
+  if (spanSec <= 7 * 86400)   return 21600;    // ≤7d  → 6h
+  if (spanSec <= 30 * 86400)  return 86400;    // ≤30d → 1d
+  if (spanSec <= 90 * 86400)  return 604800;   // ≤90d → 1w
+  return 2592000;                              // >90d → 30d
 }
 function relTime(iso) {
   const d = new Date(iso);
@@ -796,13 +886,14 @@ function renderRangeButtons() {
     b.addEventListener('click', () => {
       STATE.range_minutes = parseInt(b.dataset.minutes, 10);
       renderRangeButtons();
-      reloadAllPanels();
+      if (STATE.view === 'detail') reloadAllPanels();
+      else reloadAllSparklines();
     });
   });
 }
 
 // =============================================================================
-// Per-job tabs (one per (topic, consumer_group) × env)
+// Job catalog — fan out (topic, consumer_group) across environments
 // =============================================================================
 function _buildJobs() {
   const out = [];
@@ -821,44 +912,181 @@ function _buildJobs() {
   return out;
 }
 
-function renderJobTabs() {
-  const root = document.getElementById('job-tabs');
+// =============================================================================
+// Team-grouped card grid
+// =============================================================================
+function _groupByTeam(jobs) {
+  const map = new Map();
+  for (const j of jobs) {
+    const key = j.team || 'Unassigned';
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(j);
+  }
+  return map;
+}
+
+function _fmtMmsgs(lag) {
+  return (lag / 1e6).toFixed(2);
+}
+
+function renderTeamGrid() {
+  const root = document.getElementById('team-grid');
   if (!STATE.jobs.length) {
-    root.innerHTML = '<div class="loading" style="padding:8px 0;">(no jobs in catalog)</div>';
+    root.innerHTML = `
+      <div class="grid-head">
+        <span class="grid-title">Consumer-group jobs · live status</span>
+        <span class="grid-meta" id="grid-last-update">Last update: --</span>
+      </div>
+      <div class="loading" style="padding:24px;background:var(--bg-1);border:1px solid var(--line);border-top:0;border-radius:0 0 8px 8px;">No jobs in catalog.</div>
+    `;
     return;
   }
-  root.innerHTML = STATE.jobs.map((j, i) => {
-    const active = i === STATE.selected_job_idx ? ' active' : '';
-    const breach = STATE.job_status[j.job_id] === 'breach' ? ' breach' : '';
-    return `
-      <button class="job-tab${active}${breach}" data-idx="${i}" title="${j.topic} · ${j.consumer_group}">
-        <span class="env-chip">${j.environment.toUpperCase()}</span>
-        <span class="topic">${j.topic}</span>
-      </button>
+
+  const groups = _groupByTeam(STATE.jobs);
+  let sectionsHtml = '';
+  for (const [team, members] of groups) {
+    const total = members.length;
+    const breaching = members.filter(j => (STATE.job_state[j.job_id]||{}).status === 'breach').length;
+    const healthy = total - breaching;
+    const channel = members[0].channel || '';
+    const breachClass = breaching > 0 ? ' has' : '';
+
+    let cardsHtml = '';
+    for (let i = 0; i < members.length; i++) {
+      const j = members[i];
+      const idx = STATE.jobs.indexOf(j);
+      const st = STATE.job_state[j.job_id] || { lag: 0, status: 'ok' };
+      const statusCls = st.status === 'breach' ? 'breach' : 'healthy';
+      const statusLabel = st.status === 'breach' ? '▲ BREACH' : '✓ HEALTHY';
+      const cardCls = st.status === 'breach' ? ' breach' : '';
+      const slotId = `card-spark-${idx}`;
+      cardsHtml += `
+        <div class="job-card${cardCls}" data-idx="${idx}">
+          <div class="card-head">
+            <span class="card-title">${j.topic}</span>
+            <span class="card-env">${j.environment.toUpperCase()}</span>
+          </div>
+          <div class="card-sub">${j.team || ''} · ${j.channel || ''}</div>
+          <div id="${slotId}" class="card-spark-empty">no data</div>
+          <div class="card-foot">
+            <span><span class="card-value">${_fmtMmsgs(st.lag)}</span><span class="card-value-unit">M msgs</span></span>
+            <span class="card-pill ${statusCls}">${statusLabel}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    sectionsHtml += `
+      <div class="team-section">
+        <div class="team-head">
+          <span class="team-name">${team.toUpperCase()}</span>
+          <span class="team-chip">${channel}</span>
+          <span class="team-counts">
+            <span class="count breach${breachClass}">${breaching} BREACHING</span>
+            <span class="count healthy">${healthy} HEALTHY</span>
+            <span class="sep">· ${total} job${total === 1 ? '' : 's'}</span>
+          </span>
+        </div>
+        <div class="cards-grid">${cardsHtml}</div>
+      </div>
     `;
-  }).join('');
-  root.querySelectorAll('.job-tab').forEach(btn => {
-    btn.addEventListener('click', () => {
-      STATE.selected_job_idx = parseInt(btn.dataset.idx, 10);
-      renderJobTabs();
-      renderJobView();
-      reloadAllPanels();
+  }
+
+  root.innerHTML = `
+    <div class="grid-head">
+      <span class="grid-title">Consumer-group jobs · live status</span>
+      <span class="grid-meta" id="grid-last-update">Last update: --</span>
+    </div>
+    ${sectionsHtml}
+  `;
+
+  root.querySelectorAll('.job-card').forEach(card => {
+    card.addEventListener('click', () => {
+      STATE.selected_job_idx = parseInt(card.dataset.idx, 10);
+      openDetailView();
     });
   });
 }
 
+async function loadCardSparkline(job, minutes) {
+  const idx = STATE.jobs.indexOf(job);
+  if (idx < 0) return;
+  const slot = document.getElementById(`card-spark-${idx}`);
+  if (!slot) return;
+  let data;
+  try {
+    data = await api(`/api/job/${encodeURIComponent(job.job_id)}/history?minutes=${minutes}`);
+  } catch (e) {
+    return;
+  }
+  const points = (data.history || []).map(h => h.lag || 0);
+  STATE.job_state[job.job_id] = STATE.job_state[job.job_id] || {};
+  if (points.length) {
+    STATE.job_state[job.job_id].sparkline = points;
+    drawSparkline(slot, points);
+  }
+}
+
+function drawSparkline(container, values) {
+  if (!values.length) return;
+  const W = 200, H = 50, pad = 2;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = Math.max(0.0001, max - min);
+  const innerW = W - 2 * pad;
+  const innerH = H - 2 * pad;
+  const xOf = (i) => pad + (i / Math.max(1, values.length - 1)) * innerW;
+  const yOf = (v) => pad + (1 - (v - min) / range) * innerH;
+  let d = '';
+  for (let i = 0; i < values.length; i++) {
+    d += (i ? 'L' : 'M') + xOf(i).toFixed(1) + ',' + yOf(values[i]).toFixed(1);
+  }
+  const svg = `
+    <svg class="card-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+      <path d="${d}" fill="none" stroke="${'var(--blue)'}" stroke-width="1.2" />
+    </svg>
+  `;
+  container.outerHTML = svg.replace('class="card-spark"', `class="card-spark" id="${container.id}"`);
+}
+
+async function reloadAllSparklines() {
+  const minutes = STATE.range_minutes;
+  for (const j of STATE.jobs) {
+    loadCardSparkline(j, minutes).catch(err => {
+      console.error('sparkline load failed', j.job_id, err);
+    });
+  }
+}
+
 // =============================================================================
-// Single-job view (header + panel grid)
+// Detail view (4-panel chart grid for one job)
 // =============================================================================
-function renderJobView() {
-  const root = document.getElementById('job-view');
+function openDetailView() {
+  STATE.view = 'detail';
+  document.getElementById('team-grid').style.display = 'none';
+  document.getElementById('detail-view').style.display = '';
+  renderDetailView();
+  reloadAllPanels();
+}
+
+function closeDetailView() {
+  STATE.view = 'grid';
+  document.getElementById('detail-view').style.display = 'none';
+  document.getElementById('team-grid').style.display = '';
+  reloadAllSparklines();
+}
+
+function renderDetailView() {
+  const root = document.getElementById('detail-view');
   const job = STATE.jobs[STATE.selected_job_idx];
   if (!job || !STATE.panels.length) {
-    root.innerHTML = `<div class="loading">No data source configured.</div>`;
+    root.innerHTML = `<button class="detail-back" id="detail-back-btn">← Back to all jobs</button><div class="loading">No data source configured.</div>`;
+    document.getElementById('detail-back-btn').addEventListener('click', closeDetailView);
     return;
   }
 
-  const status = STATE.job_status[job.job_id] === 'breach' ? 'breach' : 'ok';
+  const st = STATE.job_state[job.job_id] || { status: 'ok' };
+  const status = st.status === 'breach' ? 'breach' : 'ok';
   const statusLabel = status === 'breach' ? '▲ BREACH' : '✓ HEALTHY';
 
   let panelsHtml = '';
@@ -880,6 +1108,7 @@ function renderJobView() {
   }
 
   root.innerHTML = `
+    <button class="detail-back" id="detail-back-btn">← Back to all jobs</button>
     <div class="job-view-head">
       <div class="field">
         <span class="field-label">Topic</span>
@@ -905,6 +1134,7 @@ function renderJobView() {
     </div>
     <div class="panel-grid">${panelsHtml}</div>
   `;
+  document.getElementById('detail-back-btn').addEventListener('click', closeDetailView);
 }
 
 async function reloadAllPanels() {
@@ -1011,32 +1241,28 @@ function drawChart(svg, points, panel) {
     yAxis += `<text x="${padL-6}" y="${(y+3.5).toFixed(1)}" fill="#8b949e" font-size="9.5" font-family="JetBrains Mono,monospace" text-anchor="end">${FMT_K(v)}</text>`;
   }
 
-  // x-axis ticks: prefer 30-min spacing; scale up automatically for wider ranges
+  // x-axis: grid line at every step boundary; labels skipped where they'd visually
+  // collide (so 30-min spacing renders even when fewer labels can fit).
   const stepSec = _chooseTimeStep(tSpan);
-  // Snap first tick up to a step boundary in IST so labels land on round times
   const istOffsetSec = IST_OFFSET_MIN * 60;
   const firstTickIst = Math.ceil((tMin + istOffsetSec) / stepSec) * stepSec;
+  const minLabelPx = 48;     // viewBox-units between labels before we skip
   let xAxis = '';
+  let lastLabelX = -Infinity;
   for (let tIst = firstTickIst; tIst <= tMax + istOffsetSec; tIst += stepSec) {
     const t = tIst - istOffsetSec;
     const x = xOf(t);
     if (x < padL - 1 || x > padL + innerW + 1) continue;
     xAxis += `<line x1="${x.toFixed(1)}" y1="${padT}" x2="${x.toFixed(1)}" y2="${padT+innerH}" stroke="#1a1f27" stroke-width="0.5" />`;
-    const d = new Date(t * 1000);
-    const label = stepSec >= 86400 ? fmtDateIST(d) : fmtClockIST(d);
-    xAxis += `<text x="${x.toFixed(1)}" y="${(padT+innerH+13).toFixed(1)}" fill="#8b949e" font-size="9.5" font-family="JetBrains Mono,monospace" text-anchor="middle">${label}</text>`;
+    if (x - lastLabelX >= minLabelPx) {
+      const d = new Date(t * 1000);
+      const label = stepSec >= 86400 ? fmtDateIST(d) : fmtClockIST(d);
+      xAxis += `<text x="${x.toFixed(1)}" y="${(padT+innerH+13).toFixed(1)}" fill="#8b949e" font-size="9.5" font-family="JetBrains Mono,monospace" text-anchor="middle">${label}</text>`;
+      lastLabelX = x;
+    }
   }
 
-  // Spike-style line: vertical line for each point from baseline
-  const baseline = yOf(yMin);
-  let spikes = '';
-  for (let i = 0; i < points.length; i++) {
-    const x = xOf(tsArr[i]);
-    const y = yOf(valArr[i]);
-    spikes += `<line x1="${x.toFixed(1)}" y1="${baseline.toFixed(1)}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${panel.color}" stroke-width="1" />`;
-  }
-
-  // Connect-the-dots line on top (like Grafana when zoomed out)
+  // Clean line chart (no baseline spikes).
   const path = points.map((p, i) =>
     (i ? 'L' : 'M') + xOf(p.ts).toFixed(1) + ',' + yOf(p.value).toFixed(1)
   ).join('');
@@ -1044,8 +1270,7 @@ function drawChart(svg, points, panel) {
   svg.innerHTML = `
     ${yAxis}
     ${xAxis}
-    ${spikes}
-    <path d="${path}" fill="none" stroke="${panel.color}" stroke-width="0.7" opacity="0.6" />
+    <path d="${path}" fill="none" stroke="${panel.color}" stroke-width="1.5" stroke-linejoin="round" />
   `;
 }
 
@@ -1079,18 +1304,43 @@ async function refreshStatus() {
     }
     updateSlackIndicator(data.summary.slack_configured);
 
-    // Update per-job breach indicator on tabs + the active job's status pill
-    const next = {};
-    for (const j of (data.jobs || [])) next[j.job_id] = j.status;
-    const changed = STATE.jobs.some(j => STATE.job_status[j.job_id] !== next[j.job_id]);
-    STATE.job_status = next;
-    if (changed) {
-      renderJobTabs();
-      // Refresh just the status pill on the current job header
-      const head = document.querySelector('#job-view .status-pill');
+    // Per-job state (lag + status). Cards re-render when status flips so the
+    // breach border / red pill appears immediately.
+    let statusChanged = false;
+    for (const j of (data.jobs || [])) {
+      const prev = STATE.job_state[j.job_id] || {};
+      if (prev.status !== j.status) statusChanged = true;
+      STATE.job_state[j.job_id] = {
+        ...prev,
+        lag: j.lag || 0,
+        status: j.status,
+      };
+    }
+
+    if (STATE.view === 'grid') {
+      const lu = document.getElementById('grid-last-update');
+      if (lu && data.summary.last_poll_at) {
+        lu.textContent = `Last update: ${relTime(data.summary.last_poll_at)}`;
+      }
+      if (statusChanged) {
+        renderTeamGrid();
+        reloadAllSparklines();
+      } else {
+        // Cheap path: update each card's lag value + pill in place
+        for (const j of (data.jobs || [])) {
+          const idx = STATE.jobs.findIndex(x => x.job_id === j.job_id);
+          if (idx < 0) continue;
+          const card = document.querySelector(`.job-card[data-idx="${idx}"]`);
+          if (!card) continue;
+          const valEl = card.querySelector('.card-value');
+          if (valEl) valEl.textContent = _fmtMmsgs(j.lag || 0);
+        }
+      }
+    } else if (STATE.view === 'detail') {
+      const head = document.querySelector('#detail-view .status-pill');
       if (head) {
         const job = STATE.jobs[STATE.selected_job_idx];
-        const s = STATE.job_status[job.job_id] === 'breach' ? 'breach' : 'ok';
+        const s = (STATE.job_state[job.job_id] || {}).status === 'breach' ? 'breach' : 'ok';
         head.className = `status-pill ${s}`;
         head.textContent = s === 'breach' ? '▲ BREACH' : '✓ HEALTHY';
       }
@@ -1306,30 +1556,33 @@ async function boot() {
     STATE.topics = t.topics || [];
     STATE.environments = t.environments || [];
   } catch (e) {
-    document.getElementById('job-view').innerHTML = `<div class="loading">Failed to load topics: ${e.message}</div>`;
+    document.getElementById('team-grid').innerHTML = `<div class="loading">Failed to load topics: ${e.message}</div>`;
     return;
   }
   try {
     const p = await api('/api/panels');
     STATE.panels = p.panels || [];
   } catch (e) {
-    document.getElementById('job-view').innerHTML = `<div class="loading">Failed to load panels: ${e.message}</div>`;
+    document.getElementById('team-grid').innerHTML = `<div class="loading">Failed to load panels: ${e.message}</div>`;
     return;
   }
 
   STATE.jobs = _buildJobs();
+  STATE.jobs_by_id = Object.fromEntries(STATE.jobs.map(j => [j.job_id, j]));
   STATE.selected_job_idx = 0;
   renderRangeButtons();
-  renderJobTabs();
-  renderJobView();
-  reloadAllPanels();
+  renderTeamGrid();
+  reloadAllSparklines();
 
   // Background pollers
   refreshStatus();
   refreshAlerts();
   setInterval(refreshStatus, 5000);
   setInterval(refreshAlerts, 5000);
-  setInterval(reloadAllPanels, 30000);   // refresh charts every 30s
+  setInterval(() => {
+    if (STATE.view === 'detail') reloadAllPanels();
+    else reloadAllSparklines();
+  }, 30000);
 
   _aiCheckAvailability();
 }
