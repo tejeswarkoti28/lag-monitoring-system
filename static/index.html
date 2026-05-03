@@ -1274,51 +1274,88 @@ function drawChart(svg, points, data) {
     (i ? 'L' : 'M') + xOf(p.ts).toFixed(1) + ',' + yOf(p.value).toFixed(1)
   ).join('');
 
-  // Breach fill: red area between line and threshold, only above threshold.
-  // Implementation: render the data as a closed area (line down to baseline),
-  // filled red, then clip to the rectangle ABOVE the threshold line.
+  // Breach band: a polygon bounded ABOVE by max(line, threshold) and BELOW by
+  // the threshold line itself. Where the line is below threshold, top edge ==
+  // bottom edge so the band collapses to zero height. No fill ever spills
+  // into the safe zone below the threshold.
+  const lineColor = data.color || '#58a6ff';
   let breachFill = '';
   let thresholdLine = '';
+  let gradId = '';
   if (showThr) {
     const thrY = yOf(thr);
-    const lineColor = data.color || '#58a6ff';
-    const areaPath = linePath +
-      `L${xOf(tMax).toFixed(1)},${baselineY.toFixed(1)}` +
-      `L${xOf(tMin).toFixed(1)},${baselineY.toFixed(1)}Z`;
-    const clipId = `breach-clip-${Math.random().toString(36).slice(2, 8)}`;
+    let top = '';
+    for (let i = 0; i < points.length; i++) {
+      const yv = yOf(Math.max(valArr[i], thr));
+      top += (i ? 'L' : 'M') + xOf(tsArr[i]).toFixed(1) + ',' + yv.toFixed(1);
+    }
+    let bottom = '';
+    for (let i = points.length - 1; i >= 0; i--) {
+      bottom += `L${xOf(tsArr[i]).toFixed(1)},${thrY.toFixed(1)}`;
+    }
+    const breachAreaPath = top + bottom + 'Z';
+
+    gradId = `gr-breach-${Math.random().toString(36).slice(2, 8)}`;
     breachFill = `
       <defs>
-        <clipPath id="${clipId}">
-          <rect x="${padL}" y="${padT}" width="${innerW}" height="${(thrY - padT).toFixed(1)}" />
-        </clipPath>
+        <linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#f85149" stop-opacity="0.05" />
+          <stop offset="100%" stop-color="#f85149" stop-opacity="0.45" />
+        </linearGradient>
       </defs>
-      <path d="${areaPath}" fill="rgba(248,81,73,0.55)" clip-path="url(#${clipId})" />
+      <path d="${breachAreaPath}" fill="url(#${gradId})" stroke="none" />
     `;
     thresholdLine = `
       <line x1="${padL}" y1="${thrY.toFixed(1)}" x2="${padL+innerW}" y2="${thrY.toFixed(1)}"
-            stroke="#f85149" stroke-width="1" stroke-dasharray="5,4" opacity="0.85" />
-      <g transform="translate(${(padL+innerW-90).toFixed(1)}, ${(thrY-9).toFixed(1)})">
-        <rect width="86" height="16" rx="2" fill="#3a1a1a" stroke="#6d2c2c" />
-        <text x="43" y="11.5" fill="#f85149" font-size="10" font-family="JetBrains Mono,monospace" text-anchor="middle" font-weight="700">threshold ${FMT_K(thr)}</text>
+            stroke="#f85149" stroke-width="1.2" stroke-dasharray="5,4" opacity="0.9" />
+      <g transform="translate(${(padL+innerW-92).toFixed(1)}, ${(thrY-9).toFixed(1)})">
+        <rect width="88" height="16" rx="3" fill="#1a0d0d" stroke="#6d2c2c" />
+        <text x="44" y="11.5" fill="#f85149" font-size="10" font-family="JetBrains Mono,monospace" text-anchor="middle" font-weight="700">threshold ${FMT_K(thr)}</text>
       </g>
     `;
   }
 
-  // Current-value callout near the rightmost point: "X.XXM @ HH:MM"
+  // Subtle area fill UNDER the line (below threshold, in line color) so the
+  // line has visual mass without overpowering the data
+  const safePathTop = points.map((p, i) =>
+    (i ? 'L' : 'M') + xOf(p.ts).toFixed(1) + ',' + yOf(showThr ? Math.min(p.value, thr) : p.value).toFixed(1)
+  ).join('');
+  const safeAreaPath = safePathTop +
+    `L${xOf(tMax).toFixed(1)},${baselineY.toFixed(1)}` +
+    `L${xOf(tMin).toFixed(1)},${baselineY.toFixed(1)}Z`;
+  const safeGradId = `gr-safe-${Math.random().toString(36).slice(2, 8)}`;
+  const safeFill = `
+    <defs>
+      <linearGradient id="${safeGradId}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${lineColor}" stop-opacity="0.30" />
+        <stop offset="100%" stop-color="${lineColor}" stop-opacity="0.04" />
+      </linearGradient>
+    </defs>
+    <path d="${safeAreaPath}" fill="url(#${safeGradId})" stroke="none" />
+  `;
+
+  // Current-value callout near the rightmost point: "X.XXM @ HH:MM" with a
+  // gently pulsing dot to signal "live"
   const lastT = tsArr[tsArr.length - 1];
   const lastV = valArr[valArr.length - 1];
   const lastX = xOf(lastT);
   const lastY = yOf(lastV);
+  const isBreaching = showThr && lastV >= thr;
+  const dotColor = isBreaching ? '#f85149' : lineColor;
   const calloutLabel = `${FMT_K(lastV)} @ ${fmtClockIST(new Date(lastT * 1000))}`;
-  const calloutW = Math.max(78, calloutLabel.length * 6 + 10);
-  let calloutX = lastX - calloutW - 6;
-  if (calloutX < padL + 4) calloutX = lastX + 6;
-  const calloutY = Math.max(padT + 6, Math.min(padT + innerH - 22, lastY + 8));
+  const calloutW = Math.max(82, calloutLabel.length * 6 + 12);
+  let calloutX = lastX - calloutW - 8;
+  if (calloutX < padL + 4) calloutX = lastX + 8;
+  const calloutY = Math.max(padT + 6, Math.min(padT + innerH - 22, lastY + 10));
   const callout = `
-    <circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="2.5" fill="${data.color || '#58a6ff'}" />
+    <circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="3" fill="${dotColor}">
+      <animate attributeName="r" values="3;5.5;3" dur="1.6s" repeatCount="indefinite" />
+      <animate attributeName="opacity" values="1;0.55;1" dur="1.6s" repeatCount="indefinite" />
+    </circle>
+    <circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="2.2" fill="${dotColor}" />
     <g transform="translate(${calloutX.toFixed(1)}, ${calloutY.toFixed(1)})">
-      <rect width="${calloutW}" height="16" rx="2" fill="#0e1218" stroke="#2e3742" />
-      <text x="${calloutW/2}" y="11.5" fill="#e6edf3" font-size="9.5" font-family="JetBrains Mono,monospace" text-anchor="middle" font-weight="600">${calloutLabel}</text>
+      <rect width="${calloutW}" height="17" rx="3" fill="#0e1218" stroke="${isBreaching ? '#6d2c2c' : '#2e3742'}" />
+      <text x="${calloutW/2}" y="12" fill="${isBreaching ? '#f85149' : '#e6edf3'}" font-size="10" font-family="JetBrains Mono,monospace" text-anchor="middle" font-weight="700">${calloutLabel}</text>
     </g>
   `;
 
@@ -1331,9 +1368,10 @@ function drawChart(svg, points, data) {
   svg.innerHTML = `
     ${yAxis}
     ${xAxis}
+    ${safeFill}
     ${breachFill}
     ${thresholdLine}
-    <path d="${linePath}" fill="none" stroke="${data.color || '#58a6ff'}" stroke-width="1.5" stroke-linejoin="round" />
+    <path d="${linePath}" fill="none" stroke="${lineColor}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" />
     ${callout}
     ${axisLabels}
   `;
