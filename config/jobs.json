@@ -1,4 +1,4 @@
-{
+
   "_comment": "Job catalog. Each entry is fanned out across `environments` so 9 jobs x 2 envs = 18 monitored consumer groups. Edit this file (no Python changes needed) to add/remove jobs. Override threshold via LAG_THRESHOLD env var.",
   "threshold_messages": 5000,
   "environments": ["eus", "scus"],
@@ -10,8 +10,8 @@
       "channel": "#pno-team"
     },
     {
-      "topic": "canada-pno-offerranked-events",
-      "consumer_group": "ca-priceoffer-clearcache-5",
+      "topic": "ca-price-offer-unifiedrollup-offer-events",
+      "consumer_group": "ca-priceoffer-rollup",
       "team": "PNO Team",
       "channel": "#pno-team"
     }
