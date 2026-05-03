@@ -165,4 +165,14 @@ class PrometheusDataSource(DataSource):
             h["Authorization"] = f"Bearer {self._auth_token}"
         if self._cookie:
             h["Cookie"] = self._cookie
+            # Walmart's Grafana proxy validates these alongside the cookie —
+            # some setups check that the request looks like it came from a
+            # browser session, not a bare API call.
+            h["User-Agent"] = (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            )
+            h["Referer"] = self._base_url.split("/api/")[0] + "/"
+            h["Origin"] = self._base_url.split("/api/")[0]
         return h
