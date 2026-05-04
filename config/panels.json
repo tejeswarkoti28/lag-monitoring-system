@@ -11,7 +11,7 @@
       "scope": ["env", "topic", "consumer_group"],
       "unit": "short",
       "y_min": 0,
-      "color": "#58a6ff",
+      "color": "#84d957",
       "show_threshold": true,
       "description": "Worst-partition lag — the slowest partition's lag. Drives the breach decision."
     },
@@ -24,7 +24,7 @@
       "scope": ["env", "topic", "consumer_group"],
       "unit": "short",
       "y_min": 0,
-      "color": "#58a6ff",
+      "color": "#84d957",
       "show_threshold": true,
       "description": "Sum of lag across all partitions of the topic for this consumer group."
     },

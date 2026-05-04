@@ -256,7 +256,20 @@
     display: flex; flex-direction: column; gap: 6px;
   }
   .job-card:hover { border-color: var(--line-2); transform: translateY(-1px); }
-  .job-card.breach { border-color: #6d2c2c; }
+  .job-card.breach {
+    border-color: #f85149;
+    animation: breach-pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes breach-pulse {
+    0%, 100% {
+      box-shadow: 0 0 0 0 rgba(248, 81, 73, 0.0),
+                  0 0 0 0 rgba(248, 81, 73, 0.0);
+    }
+    50% {
+      box-shadow: 0 0 0 1px rgba(248, 81, 73, 0.45),
+                  0 0 14px 2px rgba(248, 81, 73, 0.35);
+    }
+  }
   .card-head {
     display: flex; align-items: flex-start; gap: 8px; justify-content: space-between;
   }
@@ -363,12 +376,32 @@
   .modal-body { padding: 12px 20px 20px 20px; }
 
   .chart-card {
-    background: var(--bg-2);
+    background: #0a0d11;
     border: 1px solid var(--line);
     border-radius: 6px;
     padding: 12px 14px;
     margin-bottom: 14px;
   }
+  .chart-foot {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; margin-top: 6px; padding-top: 6px;
+    border-top: 1px solid var(--line);
+    font: 600 10.5px 'JetBrains Mono', monospace;
+    color: var(--text-mute);
+    flex-wrap: wrap;
+  }
+  .chart-legend {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: var(--text-dim);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    max-width: 60%;
+  }
+  .chart-legend .dot {
+    display: inline-block; width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0;
+  }
+  .chart-stats { display: inline-flex; gap: 14px; }
+  .chart-stats span { color: var(--text-mute); }
+  .chart-stats b { color: var(--text); font-weight: 700; margin-left: 3px; }
   .chart-card-head {
     display: flex; align-items: center; justify-content: space-between;
     gap: 10px; margin-bottom: 8px; flex-wrap: wrap;
@@ -818,6 +851,26 @@ const FMT_K = (n) => {
   return Math.round(n).toString();
 };
 
+// Compact integer formatter for chart axis labels: "200K" not "200.00K".
+// Uses 1 decimal only when needed (e.g. 1.5M) and trims trailing .0.
+const FMT_AXIS = (n) => {
+  if (n === null || n === undefined || isNaN(n)) return '0';
+  const abs = Math.abs(n);
+  if (abs === 0) return '0';
+  if (abs >= 1e9) {
+    const v = n / 1e9;
+    return (v >= 10 ? Math.round(v).toString() : v.toFixed(1).replace(/\.0$/, '')) + 'B';
+  }
+  if (abs >= 1e6) {
+    const v = n / 1e6;
+    return (v >= 10 ? Math.round(v).toString() : v.toFixed(1).replace(/\.0$/, '')) + 'M';
+  }
+  if (abs >= 1e3) {
+    return Math.round(n / 1e3) + 'K';
+  }
+  return Math.round(n).toString();
+};
+
 // IST = UTC + 5:30
 const IST_OFFSET_MIN = 330;
 function _toIST(d) { return new Date(d.getTime() + IST_OFFSET_MIN * 60000); }
@@ -918,8 +971,13 @@ function _groupByTeam(jobs) {
   return map;
 }
 
-function _fmtMmsgs(lag) {
-  return (lag / 1e6).toFixed(2);
+function _fmtCardLag(lag) {
+  // Auto-pick unit so a 5K lag isn't printed as "0.00 M"
+  const abs = Math.abs(lag || 0);
+  if (abs >= 1e9) return { v: (lag / 1e9).toFixed(2), u: 'B msgs' };
+  if (abs >= 1e6) return { v: (lag / 1e6).toFixed(2), u: 'M msgs' };
+  if (abs >= 1e3) return { v: (lag / 1e3).toFixed(2), u: 'K msgs' };
+  return { v: Math.round(lag || 0).toString(), u: 'msgs' };
 }
 
 function renderTeamGrid() {
@@ -962,7 +1020,7 @@ function renderTeamGrid() {
           <div class="card-sub">${j.team || ''} · ${j.channel || ''}</div>
           <div id="${slotId}" class="card-spark-empty">no data</div>
           <div class="card-foot">
-            <span><span class="card-value">${_fmtMmsgs(st.lag)}</span><span class="card-value-unit">M msgs</span></span>
+            <span><span class="card-value">${_fmtCardLag(st.lag).v}</span><span class="card-value-unit">${_fmtCardLag(st.lag).u}</span></span>
             <span class="card-pill ${statusCls}">${statusLabel}</span>
           </div>
         </div>
@@ -1104,12 +1162,13 @@ function renderDetailModal() {
     <span class="info-item">${job.team || '--'} · ${job.channel || '--'}</span>
     <span class="info-item">Consumer group:<b>${job.consumer_group}</b></span>
     <span class="info-item">Environment:<b>${job.environment.toUpperCase()}</b></span>
-    <span class="info-item">Threshold:<b>${_fmtMmsgs(threshold)}M</b></span>
+    <span class="info-item">Threshold:<b>${FMT_AXIS(threshold)}</b></span>
   `;
   // Current lag will be filled in once data arrives; show last known status now
   const st = STATE.job_state[job.job_id] || {};
+  const cur = _fmtCardLag(st.lag || 0);
   document.getElementById('modal-current').innerHTML =
-    `Current lag (max of both): <b>${_fmtMmsgs(st.lag || 0)}M</b>`;
+    `Current lag (max of both): <b>${cur.v} ${cur.u}</b>`;
 
   // Render one chart-card per panel
   const body = document.getElementById('modal-body');
@@ -1131,6 +1190,13 @@ function renderDetailModal() {
           <span class="chart-range">${rangeHtml}</span>
         </div>
         <div class="chart-loading">Loading…</div>
+        <div class="chart-foot">
+          <span class="chart-legend">
+            <span class="dot" style="background:${p.color}"></span>
+            <span>${p.title}</span>
+          </span>
+          <span class="chart-stats" id="chart-stats-${p.id}">--</span>
+        </div>
       </div>
     `;
   }
@@ -1186,12 +1252,30 @@ async function loadPanel(panel, job, minutes) {
   }
 
   const points = data.points || [];
+  const statsEl = document.getElementById(`chart-stats-${panel.id}`);
   if (currentEl) {
     if (points.length) {
       const last = points[points.length - 1].value;
       currentEl.innerHTML = `CURRENT <b>${FMT_K(last)}</b>`;
     } else {
       currentEl.innerHTML = '<span style="color:var(--text-mute)">no data</span>';
+    }
+  }
+  if (statsEl) {
+    if (points.length) {
+      const values = points.map(p => p.value);
+      const mean = values.reduce((a, b) => a + b, 0) / values.length;
+      const last = values[values.length - 1];
+      const max = Math.max(...values);
+      const min = Math.min(...values);
+      statsEl.innerHTML = `
+        <span>Mean<b>${FMT_K(mean)}</b></span>
+        <span>Last<b>${FMT_K(last)}</b></span>
+        <span>Max<b>${FMT_K(max)}</b></span>
+        <span>Min<b>${FMT_K(min)}</b></span>
+      `;
+    } else {
+      statsEl.innerHTML = '<span style="color:var(--text-mute)">no data</span>';
     }
   }
 
@@ -1251,7 +1335,7 @@ function drawChart(svg, points, data) {
   for (let v = Math.ceil(yMin / niceStep) * niceStep; v <= yMax + 0.0001; v += niceStep) {
     const y = yOf(v);
     yAxis += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${padL+innerW}" y2="${y.toFixed(1)}" stroke="#1a1f27" stroke-width="0.5" />`;
-    yAxis += `<text x="${padL-6}" y="${(y+3.5).toFixed(1)}" fill="#8b949e" font-size="9.5" font-family="JetBrains Mono,monospace" text-anchor="end">${FMT_K(v)}</text>`;
+    yAxis += `<text x="${padL-6}" y="${(y+3.5).toFixed(1)}" fill="#8b949e" font-size="9.5" font-family="JetBrains Mono,monospace" text-anchor="end">${FMT_AXIS(v)}</text>`;
   }
 
   // X-axis: 30-min spacing for ≤24h windows; labels skipped if they'd collide
@@ -1319,7 +1403,7 @@ function drawChart(svg, points, data) {
             stroke="#f85149" stroke-width="1.2" stroke-dasharray="5,4" opacity="0.9" />
       <g transform="translate(${(padL+innerW-92).toFixed(1)}, ${(thrY-9).toFixed(1)})">
         <rect width="88" height="16" rx="3" fill="#1a0d0d" stroke="#6d2c2c" />
-        <text x="44" y="11.5" fill="#f85149" font-size="10" font-family="JetBrains Mono,monospace" text-anchor="middle" font-weight="700">threshold ${FMT_K(thr)}</text>
+        <text x="44" y="11.5" fill="#f85149" font-size="10" font-family="JetBrains Mono,monospace" text-anchor="middle" font-weight="700">threshold ${FMT_AXIS(thr)}</text>
       </g>
     `;
   }
@@ -1351,7 +1435,7 @@ function drawChart(svg, points, data) {
   const lastY = yOf(lastV);
   const isBreaching = showThr && lastV >= thr;
   const dotColor = isBreaching ? '#f85149' : lineColor;
-  const calloutLabel = `${FMT_K(lastV)} @ ${fmtClockIST(new Date(lastT * 1000))}`;
+  const calloutLabel = `${FMT_AXIS(lastV)} @ ${fmtClockIST(new Date(lastT * 1000))}`;
   const calloutW = Math.max(82, calloutLabel.length * 6 + 12);
   let calloutX = lastX - calloutW - 8;
   if (calloutX < padL + 4) calloutX = lastX + 8;
@@ -1446,7 +1530,12 @@ async function refreshStatus() {
           const card = document.querySelector(`.job-card[data-idx="${idx}"]`);
           if (!card) continue;
           const valEl = card.querySelector('.card-value');
-          if (valEl) valEl.textContent = _fmtMmsgs(j.lag || 0);
+          if (valEl) {
+            const f = _fmtCardLag(j.lag || 0);
+            valEl.textContent = f.v;
+            const unitEl = card.querySelector('.card-value-unit');
+            if (unitEl) unitEl.textContent = f.u;
+          }
         }
       }
     } else if (STATE.view === 'detail') {
@@ -1455,7 +1544,8 @@ async function refreshStatus() {
       const cur = document.getElementById('modal-current');
       if (cur && job) {
         const lag = (STATE.job_state[job.job_id] || {}).lag || 0;
-        cur.innerHTML = `Current lag (max of both): <b>${_fmtMmsgs(lag)}M</b>`;
+        const f = _fmtCardLag(lag);
+        cur.innerHTML = `Current lag (max of both): <b>${f.v} ${f.u}</b>`;
       }
     }
   } catch (e) {
@@ -1692,10 +1782,13 @@ async function boot() {
   refreshAlerts();
   setInterval(refreshStatus, 5000);
   setInterval(refreshAlerts, 5000);
+  // User-tunable cadence. Charts re-fetch every 2 min to match the backend
+  // poll cadence (POLL_INTERVAL_SECONDS=120 in .env). Status/alerts/clock
+  // refresh more often so the page still feels live.
   setInterval(() => {
     if (STATE.view === 'detail') reloadAllPanels();
     else reloadAllSparklines();
-  }, 30000);
+  }, 120000);
 
   _aiCheckAvailability();
 }
