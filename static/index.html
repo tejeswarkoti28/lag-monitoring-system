@@ -126,49 +126,15 @@
   .stat.alerts .stat-value { color: var(--orange); }
   .stat-sub { color: var(--text-mute); font-size: 11px; margin-top: 2px; }
 
-  /* Controls bar (topic + time range) */
-  .controls {
-    display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
-    padding: 14px 22px 0 22px;
-  }
-  .controls label {
-    font-size: 11px; color: var(--text-dim); text-transform: uppercase;
-    letter-spacing: 0.6px; font-weight: 600;
-  }
-  select, button {
+  /* Generic button styling (used by panel-level inline range bars) */
+  button {
     font-family: inherit; font-size: 13px;
     background: var(--bg-2); color: var(--text);
     border: 1px solid var(--line-2);
     border-radius: 5px; padding: 7px 11px;
     cursor: pointer;
   }
-  select { font-family: 'JetBrains Mono', monospace; min-width: 360px; }
   button:disabled { opacity: 0.6; cursor: not-allowed; }
-
-  .range-group {
-    display: inline-flex;
-    background: var(--bg-2);
-    border: 1px solid var(--line);
-    border-radius: 5px;
-    overflow: hidden;
-  }
-  .range-btn {
-    background: transparent;
-    color: var(--text-dim);
-    border: 0;
-    border-right: 1px solid var(--line);
-    padding: 5px 10px;
-    font: 600 11px 'JetBrains Mono', monospace;
-    letter-spacing: 0.5px;
-    cursor: pointer;
-  }
-  .range-btn:last-child { border-right: 0; }
-  .range-btn:hover { background: var(--bg-3); color: var(--text); }
-  .range-btn.active {
-    background: #1e2730;
-    color: var(--blue);
-    box-shadow: inset 0 -2px 0 var(--blue);
-  }
 
   /* Main layout: cards on left, alert feed on right */
   .main {
@@ -718,12 +684,6 @@
   </div>
 </div>
 
-<div class="controls">
-  <label>Range</label>
-  <div class="range-group" id="range-group" role="tablist"></div>
-  <span class="indicator" style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;" id="last-poll">last poll: --</span>
-</div>
-
 <div class="main">
   <div id="main-content">
     <div id="team-grid">
@@ -808,17 +768,9 @@
 // =============================================================================
 // State + utilities
 // =============================================================================
-const RANGE_PRESETS = [
-  { key: '30m', label: '30m', minutes: 30 },
-  { key: '6h',  label: '6h',  minutes: 360 },
-  { key: '12h', label: '12h', minutes: 720 },
-  { key: '24h', label: '24h', minutes: 1440 },
-  { key: '2d',  label: '2d',  minutes: 2880 },
-  { key: '15d', label: '15d', minutes: 21600 },
-  { key: '1mo', label: '1mo', minutes: 43200 },
-  { key: '3mo', label: '3mo', minutes: 129600 },
-  { key: '6mo', label: '6mo', minutes: 259200 },
-];
+// Sparklines on the team-grid cards always show this many minutes. Each modal
+// chart picks its own range from the per-chart range bar.
+const SPARKLINE_MINUTES = 30;
 
 const STATE = {
   topics: [],          // [{topic, consumer_group, team, channel}]
@@ -830,7 +782,6 @@ const STATE = {
   summary: {},         // last /api/status summary (incl. threshold for modal)
   view: 'grid',        // 'grid' | 'detail'
   selected_job_idx: 0,
-  range_minutes: 720,  // default 12h to match Grafana
   poll_handle: null,
   seen_alert_ids: new Set(),
 };
@@ -918,24 +869,6 @@ function relTime(iso) {
   if (s < 60)   return s + 's ago';
   if (s < 3600) return Math.floor(s/60) + 'm ago';
   return Math.floor(s/3600) + 'h ago';
-}
-
-// =============================================================================
-// Range buttons
-// =============================================================================
-function renderRangeButtons() {
-  const root = document.getElementById('range-group');
-  root.innerHTML = RANGE_PRESETS.map(p =>
-    `<button class="range-btn${p.minutes === STATE.range_minutes ? ' active' : ''}" data-minutes="${p.minutes}">${p.label}</button>`
-  ).join('');
-  root.querySelectorAll('.range-btn').forEach(b => {
-    b.addEventListener('click', () => {
-      STATE.range_minutes = parseInt(b.dataset.minutes, 10);
-      renderRangeButtons();
-      if (STATE.view === 'detail') reloadAllPanels();
-      else reloadAllSparklines();
-    });
-  });
 }
 
 // =============================================================================
@@ -1101,9 +1034,8 @@ function drawSparkline(container, values) {
 }
 
 async function reloadAllSparklines() {
-  const minutes = STATE.range_minutes;
   for (const j of STATE.jobs) {
-    loadCardSparkline(j, minutes).catch(err => {
+    loadCardSparkline(j, SPARKLINE_MINUTES).catch(err => {
       console.error('sparkline load failed', j.job_id, err);
     });
   }
@@ -1495,10 +1427,6 @@ async function refreshStatus() {
     document.getElementById('stat-healthy').textContent = data.summary.healthy;
     document.getElementById('stat-alerts').textContent = data.summary.alerts_24h;
     document.getElementById('stat-envs').textContent = STATE.environments.join(' + ');
-    if (data.summary.last_poll_at) {
-      document.getElementById('last-poll').textContent =
-        `last poll: ${relTime(data.summary.last_poll_at)}`;
-    }
     updateSlackIndicator(data.summary.slack_configured);
 
     // Per-job state (lag + status). Cards re-render when status flips so the
@@ -1773,7 +1701,6 @@ async function boot() {
   STATE.jobs = _buildJobs();
   STATE.jobs_by_id = Object.fromEntries(STATE.jobs.map(j => [j.job_id, j]));
   STATE.selected_job_idx = 0;
-  renderRangeButtons();
   renderTeamGrid();
   reloadAllSparklines();
 
