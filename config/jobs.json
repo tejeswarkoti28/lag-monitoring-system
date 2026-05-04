@@ -4,12 +4,6 @@
   "environments": ["eus", "scus"],
   "jobs": [
     {
-      "topic": "canada-pno-offeringestion-events",
-      "consumer_group": "ca-priceoffer-3P-offer-ingestion-job-4",
-      "team": "PNO Team",
-      "channel": "#pno-team"
-    },
-    {
       "topic": "ca-price-offer-unifiedrollup-offer-events",
       "consumer_group": "ca-priceoffer-rollup",
       "team": "PNO Team",
