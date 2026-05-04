@@ -1227,8 +1227,13 @@ function drawChart(svg, points, data) {
   let dataMin = Math.min(...valArr);
   if (data.y_min != null) dataMin = Math.min(dataMin, data.y_min);
   if (data.y_max != null) dataMax = Math.max(dataMax, data.y_max);
-  // Pad max so the threshold line + a little headroom are visible
-  if (showThr) dataMax = Math.max(dataMax, thr * 1.4);
+  // Only force the threshold into the y-axis when the data is in the same
+  // ballpark (≥30% of threshold). If the data is way below — say current lag
+  // is 5K vs a 5M threshold — fitting the threshold would crush the data line
+  // against the baseline and make it invisible. In that case we just zoom to
+  // the data; the threshold line is hidden because it's far above the chart.
+  const thrInRange = showThr && dataMax >= thr * 0.3;
+  if (thrInRange) dataMax = Math.max(dataMax, thr * 1.2);
   if (dataMax === dataMin) dataMax = dataMin + 1;
   const yMin = data.y_min != null ? data.y_min : Math.max(0, dataMin);
   const yMax = data.y_max != null ? data.y_max : dataMax * 1.05;
@@ -1282,7 +1287,11 @@ function drawChart(svg, points, data) {
   let breachFill = '';
   let thresholdLine = '';
   let gradId = '';
-  if (showThr) {
+  // Only render threshold annotations when the threshold falls inside the
+  // visible y-range — otherwise the dashed line and label render off-canvas
+  // or get clipped, and the band would be empty anyway.
+  const showThrUI = showThr && thr >= yMin && thr <= yMax;
+  if (showThrUI) {
     const thrY = yOf(thr);
     let top = '';
     for (let i = 0; i < points.length; i++) {
@@ -1318,7 +1327,7 @@ function drawChart(svg, points, data) {
   // Subtle area fill UNDER the line (below threshold, in line color) so the
   // line has visual mass without overpowering the data
   const safePathTop = points.map((p, i) =>
-    (i ? 'L' : 'M') + xOf(p.ts).toFixed(1) + ',' + yOf(showThr ? Math.min(p.value, thr) : p.value).toFixed(1)
+    (i ? 'L' : 'M') + xOf(p.ts).toFixed(1) + ',' + yOf(showThrUI ? Math.min(p.value, thr) : p.value).toFixed(1)
   ).join('');
   const safeAreaPath = safePathTop +
     `L${xOf(tMax).toFixed(1)},${baselineY.toFixed(1)}` +
