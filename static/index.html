@@ -90,6 +90,21 @@
   }
   .clock { font-family: 'JetBrains Mono', monospace; color: var(--text); font-size: 12px; }
 
+  .brand-btn {
+    background: var(--bg-2); color: var(--text-dim);
+    border: 1px solid var(--line-2);
+    border-radius: 5px;
+    font: 600 11px 'JetBrains Mono', monospace;
+    letter-spacing: 0.4px;
+    padding: 5px 11px;
+    cursor: pointer;
+    transition: color 0.12s, border-color 0.12s, background 0.12s;
+  }
+  .brand-btn:hover { color: var(--text); border-color: var(--blue); }
+  .brand-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  .brand-btn.success { color: var(--green); border-color: #2c5d39; background: #0e1f15; }
+  .brand-btn.error { color: var(--red); border-color: #6d2c2c; background: #1f0e10; }
+
   /* Stat strip */
   .stats {
     display: grid; grid-template-columns: repeat(4, 1fr);
@@ -654,6 +669,7 @@
     <div class="indicator" id="slack-status">
       <span class="dot"></span><span>Slack: not configured</span>
     </div>
+    <button id="slack-test-btn" class="brand-btn" title="Send a test message to every configured Slack webhook">Test Slack</button>
     <div class="indicator">
       <span class="dot live" id="poll-dot"></span><span id="poll-label">Polling 5s</span>
     </div>
@@ -1487,6 +1503,39 @@ function updateSlackIndicator(on) {
     ? '<span class="dot slack-on"></span><span>Slack: configured</span>'
     : '<span class="dot"></span><span>Slack: not configured</span>';
 }
+
+// Test Slack — sends a clearly-marked test message to every configured webhook
+const SLACK_TEST_BTN = document.getElementById('slack-test-btn');
+async function _runSlackTest() {
+  if (!SLACK_TEST_BTN) return;
+  SLACK_TEST_BTN.disabled = true;
+  SLACK_TEST_BTN.classList.remove('success', 'error');
+  const original = SLACK_TEST_BTN.textContent;
+  SLACK_TEST_BTN.textContent = 'Sending…';
+  try {
+    const r = await fetch('/api/slack/test', { method: 'POST' });
+    const data = await r.json();
+    if (!r.ok || !data.ok) {
+      SLACK_TEST_BTN.classList.add('error');
+      const failed = (data.results || []).filter(x => !x.delivered).map(x => `${x.label} (${x.detail})`).join(', ');
+      SLACK_TEST_BTN.textContent = failed ? `Failed: ${failed}` : (data.error || 'Failed');
+    } else {
+      SLACK_TEST_BTN.classList.add('success');
+      const labels = (data.results || []).map(x => x.label).join(', ');
+      SLACK_TEST_BTN.textContent = `Sent ✓ (${labels})`;
+    }
+  } catch (e) {
+    SLACK_TEST_BTN.classList.add('error');
+    SLACK_TEST_BTN.textContent = `Network error: ${e.message}`;
+  } finally {
+    setTimeout(() => {
+      SLACK_TEST_BTN.disabled = false;
+      SLACK_TEST_BTN.classList.remove('success', 'error');
+      SLACK_TEST_BTN.textContent = original;
+    }, 6000);
+  }
+}
+if (SLACK_TEST_BTN) SLACK_TEST_BTN.addEventListener('click', _runSlackTest);
 
 // =============================================================================
 // Alert feed

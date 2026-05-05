@@ -445,6 +445,36 @@ class SlackNotifier:
             print(f"[slack] post failed: {exc}", file=sys.stderr)
             return False
 
+    async def send_test(self, webhook_url: str, label: str) -> tuple[bool, str]:
+        """Send a clearly-marked test message to verify a webhook works.
+
+        Returns (delivered, status_detail). status_detail is "ok" on success
+        or a short string explaining what went wrong (e.g. "404", "no_such_host",
+        "invalid_token") so the dashboard can show a useful error.
+        """
+        payload = {
+            "text": (
+                f":test_tube: *Slack Integration Test — {label}*\n"
+                f"This is a test message from the Kafka Consumer Lag Monitor at "
+                f"*{ist_clock(now_utc())} IST*. If you see this, alerts for "
+                f"*{label}* are wired up correctly. No action required."
+            ),
+            "mrkdwn": True,
+            "attachments": [{
+                "color": "#58a6ff",
+                "footer": "Kafka Consumer Lag Monitor · webhook verification",
+                "ts": int(time.time()),
+            }],
+        }
+        try:
+            r = await self._client.post(webhook_url, json=payload)
+            if 200 <= r.status_code < 300:
+                return True, "ok"
+            return False, f"http_{r.status_code}"
+        except Exception as exc:
+            print(f"[slack] test post failed: {exc}", file=sys.stderr)
+            return False, type(exc).__name__
+
     @staticmethod
     def _build_breach_payload(event: AlertEvent) -> dict:
         r = event.reading
@@ -977,6 +1007,51 @@ def _panel_step_for(minutes: int) -> float:
     if minutes <= 43_200:    return 3600
     if minutes <= 129_600:   return 14400
     return 28800
+
+
+# Slack -----------------------------------------------------------------------
+# Posts a clearly-marked test message to every configured webhook so we can
+# verify channel routing without waiting for a real breach. Returns one entry
+# per team probed, with delivery status. Hits both team-specific webhooks
+# (SLACK_WEBHOOK_<TEAM>) and the default fallback (SLACK_WEBHOOK_URL).
+@app.post("/api/slack/test")
+async def slack_test():
+    teams_seen: dict[str, str] = {}  # webhook_url -> label (dedupe duplicate URLs)
+
+    # Probe each team that has a dedicated webhook
+    for team_name, env_var in SLACK_TEAM_ENV_VARS.items():
+        url = os.environ.get(env_var)
+        if url:
+            teams_seen.setdefault(url, team_name)
+
+    # Default fallback if no team-specific webhooks (or as additional probe)
+    default_url = os.environ.get("SLACK_WEBHOOK_URL")
+    if default_url:
+        teams_seen.setdefault(default_url, "default")
+
+    if not teams_seen:
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": (
+                    "No Slack webhooks configured. Set SLACK_WEBHOOK_URL or "
+                    "SLACK_WEBHOOK_<TEAM> in .env, then restart."
+                ),
+                "results": [],
+            },
+            status_code=400,
+        )
+
+    results = []
+    for url, label in teams_seen.items():
+        delivered, detail = await _notifier.send_test(url, label)
+        results.append({
+            "label": label,
+            "delivered": delivered,
+            "detail": detail,
+        })
+    overall_ok = all(r["delivered"] for r in results)
+    return {"ok": overall_ok, "results": results}
 
 
 # Chatbot --------------------------------------------------------------------
