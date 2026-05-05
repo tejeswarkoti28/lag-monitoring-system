@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"c:\\\\Users\\\\tejes\\\\OneDrive\\\\Desktop\\\\lag_monitoring\" add static/index.html)",
+      "Bash(git -C 'c:\\\\Users\\\\tejes\\\\OneDrive\\\\Desktop\\\\lag_monitoring' commit -m ' *)",
+      "Bash(git -C \"c:\\\\Users\\\\tejes\\\\OneDrive\\\\Desktop\\\\lag_monitoring\" push)"
+    ]
+  }
+}
