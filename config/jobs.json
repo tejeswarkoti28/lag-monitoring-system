@@ -8,6 +8,18 @@
       "consumer_group": "ca-priceoffer-rollup",
       "team": "PNO Team",
       "channel": "#pno-team"
+    },
+    {
+      "topic": "canada-catalog-sku-index-events",
+      "consumer_group": "ca-catalog-product-ingestion-prod",
+      "team": "CATALOG Team",
+      "channel": "#catalog-team"
+    },
+    {
+      "topic": "canada-pno-offeringestion-events",
+      "consumer_group": "ca-priceoffer-3P-offer-ingestion-job-4",
+      "team": "PNO Team",
+      "channel": "#pno-team"
     }
   ]
 }
