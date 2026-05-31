@@ -38,19 +38,19 @@ class DataSource(abc.ABC):
     interface — `poll_all()` is the only required method.
     """
 
-    def __init__(self, *, catalog: list[dict], environments: list[str]) -> None:
+    def __init__(self, *, catalog: list[dict]) -> None:
         self._catalog = catalog
-        self._environments = environments
         self._jobs: list[dict] = []
-        for entry in catalog:
-            for env in environments:
+        for entry in catalog:                                   #loop over each job in jobs.json
+            for env in entry.get("environments", []):           #loop over that jobs environments (eus, scus, etc)
                 self._jobs.append({
                     "job_id": f"{entry['topic']}::{env}",
                     "topic": entry["topic"],
                     "consumer_group": entry["consumer_group"],
                     "environment": env,
-                    "team": entry["team"],
-                    "channel": entry["channel"],
+                    "team": entry.get("team", ""),
+                    "channel": entry.get("channel", ""),
+                    "description": entry.get("description", ""),
                 })
 
     def jobs(self) -> list[dict]:

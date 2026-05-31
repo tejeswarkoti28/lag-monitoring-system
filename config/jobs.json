@@ -1,25 +1,126 @@
 {
-  "_comment": "Job catalog. Each entry is fanned out across `environments` so 9 jobs x 2 envs = 18 monitored consumer groups. Edit this file (no Python changes needed) to add/remove jobs. Override threshold via LAG_THRESHOLD env var.",
+  "_comment": "Job catalog. Each job declares its own environments — the app fans out only those pairs. To add a new team: set 'team' on the job, then add SLACK_WEBHOOK_<TEAM_UPPERCASE_UNDERSCORED> (and optionally SLACK_ONCALL_<TEAM_UPPERCASE_UNDERSCORED>) to .env. No code changes needed.",
   "threshold_messages": 5000,
-  "environments": ["eus", "scus"],
   "jobs": [
+    {
+      "topic": "pricing-events-prod",
+      "consumer_group": "uber-offer-price-stream-intl-wus",
+      "description": "Pricing RT to UBER",
+      "team": "Team",
+      "channel": "#pno-team",
+      "environments": ["wus"]
+    },
+    {
+      "topic": "pricing-events-prod",
+      "consumer_group": "uber-offer-price-stream-intl-scus",
+      "description": "Pricing RT to UBER",
+      "team": "Team",
+      "channel": "#pno-team",
+      "environments": ["scus"]
+    },
+    {
+      "topic": "uber-offerpricing-incremental-canada-events",
+      "consumer_group": "ca-priceoffer-3P-offer-ingestion-job-v2",
+      "description": "UBER to PNO",
+      "team": "Team",
+      "channel": "#pno-team",
+      "environments": ["wmnt-uscentral"]
+    },
+    {
+      "topic": "uber-offerpricing-incremental-canada-events",
+      "consumer_group": "ca-priceoffer-3P-offer-ingestion-job-v2",
+      "description": "UBER to PNO",
+      "team": "Team",
+      "channel": "#pno-team",
+      "environments": ["wmnt-uswest"]
+    },
+    {
+      "topic": "ca-price-offer-unifiedrollup-offer-events",
+      "consumer_group": "ca-priceoffer-rollup-east",
+      "description": "PNO to PNO Rollup Topic : price eligibility to Rollup Updates",
+      "team": "Team",
+      "channel": "#pno-team",
+      "environments": ["eus"]
+    },
     {
       "topic": "ca-price-offer-unifiedrollup-offer-events",
       "consumer_group": "ca-priceoffer-rollup",
-      "team": "PNO Team",
-      "channel": "#pno-team"
+      "description": "PNO to PNO Rollup Topic : offer_data to Rollup Updates",
+      "team": "Team",
+      "channel": "#pno-team",
+      "environments": ["scus"]
+    },
+    {
+      "topic": "canada-pno-offercalculation-events",
+      "consumer_group": "ca-priceoffer-winning-offer-rank-2-prod",
+      "description": "PNO to PNO Rollup Topic : Winning offer updates from PNO to UBER and Catalog",
+      "team": "Team",
+      "channel": "#pno-team",
+      "environments": ["scus"]
+    },
+    {
+      "topic": "Test-Topic-4",
+      "consumer_group": "ca-priceoffer-shippingPrice-calculation-2",
+      "description": "PNO to PNO Rollup Topic : Shipping price updates to PNO",
+      "team": "Team",
+      "channel": "#pno-team",
+      "environments": ["scus"]
+    },
+    {
+      "topic": "canada-pno-offerranked-events",
+      "consumer_group": "ca-priceoffer-sku-rollup-3",
+      "description": "PNO to PNO Rollup Topic : Buy Box updates to PNO",
+      "team": "Team",
+      "channel": "#pno-team",
+      "environments": ["scus"]
+    },
+    {
+      "topic": "canada-pno-congo-eligibility-calculation-events-new",
+      "consumer_group": "ca-priceoffer-sku-rollup-3",
+      "description": "PNO to PNO Rollup Topic : Buy Box updates to PNO",
+      "team": "Team",
+      "channel": "#pno-team",
+      "environments": ["scus"]
+    },
+    {
+      "topic": "canada-pno-rollup-feed",
+      "consumer_group": "ca-catalog-offer-ingestion-101-prod",
+      "description": "Offer updates from PNO to Catalog",
+      "team": "Team",
+      "channel": "#pno-team",
+      "environments": ["scus"]
+    },
+    {
+      "topic": "canada-catalog-rollup-productid-events",
+      "consumer_group": "ca-catalog-publisher-stream-2prod",
+      "description": "Catalog internal topics",
+      "team": "Team",
+      "channel": "#pno-team",
+      "environments": ["scus"]
+    },
+    {
+      "topic": "canada-catalog-delta-feed-products",
+      "consumer_group": "bedrock_ca_catalog_prod_v1",
+      "description": "Catalog internal topics",
+      "team": "Team",
+      "channel": "#pno-team",
+      "environments": ["scus"]
     },
     {
       "topic": "canada-catalog-sku-index-events",
       "consumer_group": "ca-catalog-product-ingestion-prod",
-      "team": "CATALOG Team",
-      "channel": "#catalog-team"
+      "description": "Catalog internal topics",
+      "team": "Team",
+      "channel": "#pno-team",
+      "environments": ["scus"]
     },
     {
-      "topic": "canada-pno-offeringestion-events",
-      "consumer_group": "ca-priceoffer-3P-offer-ingestion-job-4",
-      "team": "PNO Team",
-      "channel": "#pno-team"
+      "topic": "canada-catalog-sku-events",
+      "consumer_group": "ca-catalog-sku-stager-21-prod",
+      "description": "Catalog internal topics",
+      "team": "Team",
+      "channel": "#pno-team",
+      "environments": ["scus"]
     }
   ]
 }

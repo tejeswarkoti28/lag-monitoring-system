@@ -39,14 +39,13 @@ class PrometheusDataSource(DataSource):
         self,
         *,
         catalog: list[dict],
-        environments: list[str],
         base_url: str,
         auth_token: Optional[str] = None,
         static_labels: Optional[dict] = None,
         verify_ssl: bool = True,
         timeout_seconds: float = 30.0,
     ) -> None:
-        super().__init__(catalog=catalog, environments=environments)
+        super().__init__(catalog=catalog)
         if not base_url:
             raise RuntimeError(
                 "PrometheusDataSource: base_url is required. "

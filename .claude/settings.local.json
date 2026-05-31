@@ -3,7 +3,9 @@
     "allow": [
       "Bash(git -C \"c:\\\\Users\\\\tejes\\\\OneDrive\\\\Desktop\\\\lag_monitoring\" add static/index.html)",
       "Bash(git -C 'c:\\\\Users\\\\tejes\\\\OneDrive\\\\Desktop\\\\lag_monitoring' commit -m ' *)",
-      "Bash(git -C \"c:\\\\Users\\\\tejes\\\\OneDrive\\\\Desktop\\\\lag_monitoring\" push)"
+      "Bash(git -C \"c:\\\\Users\\\\tejes\\\\OneDrive\\\\Desktop\\\\lag_monitoring\" push)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\(r'c:\\\\Users\\\\tejes\\\\OneDrive\\\\Desktop\\\\lag_monitoring\\\\app.py'\\).read\\(\\)\\); print\\('app.py OK'\\)\")",
+      "Bash(python -c 'import sys; sys.stdout.reconfigure\\(encoding='\\\\''utf-8'\\\\''\\); h=open\\(r'\\\\''c:\\\\Users\\\\tejes\\\\OneDrive\\\\Desktop\\\\lag_monitoring\\\\static\\\\index.html'\\\\'', encoding='\\\\''utf-8'\\\\''\\).read\\(\\); *)"
     ]
   }
 }

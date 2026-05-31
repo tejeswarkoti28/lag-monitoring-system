@@ -39,8 +39,8 @@ def build_chat_router(chatbot: Optional[Chatbot]) -> APIRouter:
             raise HTTPException(
                 status_code=503,
                 detail=(
-                    "Chatbot is not configured. Set OPENAI_API_KEY in your "
-                    ".env (or set LLM_PROVIDER) and restart the app."
+                    "Chatbot is not configured. Set GEMINI_API_KEY in your "
+                    ".env and restart the app."
                 ),
             )
         try:

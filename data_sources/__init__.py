@@ -34,13 +34,11 @@ def build_data_source(
     config: dict,
     *,
     catalog: list[dict],
-    environments: list[str],
 ) -> DataSource:
     kind = config.get("type")
     if kind == "prometheus_via_grafana_proxy" or kind == "prometheus":
         return PrometheusDataSource(
             catalog=catalog,
-            environments=environments,
             base_url=config["url"],
             auth_token=config.get("auth"),
             static_labels=config.get("static_labels", {}),
@@ -53,33 +51,24 @@ def build_data_source(
     )
 
 
-def build_all_data_sources(
-    *,
-    catalog: list[dict],
-    environments: list[str],
-) -> dict[str, DataSource]:
+def build_all_data_sources(*, catalog: list[dict]) -> dict[str, DataSource]:
     """Build every data source from config and return them keyed by name."""
     configs = load_configs()
     return {
-        name: build_data_source(name, cfg, catalog=catalog, environments=environments)
+        name: build_data_source(name, cfg, catalog=catalog)
         for name, cfg in configs.items()
     }
 
 
-def get_primary_data_source(
-    *,
-    catalog: list[dict],
-    environments: list[str],
-) -> DataSource:
+def get_primary_data_source(*, catalog: list[dict]) -> DataSource:
     """Return the data source the Monitor / alert engine should poll.
 
     Today there's only one. When more are added, this picks 'production' by
     convention; override with the PRIMARY_DATA_SOURCE env var if needed.
     """
-    sources = build_all_data_sources(catalog=catalog, environments=environments)
+    sources = build_all_data_sources(catalog=catalog)
     name = os.environ.get("PRIMARY_DATA_SOURCE", "production")
     if name not in sources:
-        # Fall back to the first defined source if 'production' isn't there
         if not sources:
             raise RuntimeError("config/data_sources.json defines no sources")
         name = next(iter(sources))
