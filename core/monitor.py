@@ -24,6 +24,9 @@ class JobState:
     topic: str
     consumer_group: str
     environment: str
+    job: str
+    ooa: str
+    oop: str
     team: str
     channel: str
     description: str = ""
@@ -53,6 +56,9 @@ class Monitor:
                 topic=j["topic"],
                 consumer_group=j["consumer_group"],
                 environment=j["environment"],
+                job=j["job"],
+                ooa=j["ooa"],
+                oop=j["oop"],
                 team=j["team"],
                 channel=j["channel"],
                 description=j.get("description", ""),

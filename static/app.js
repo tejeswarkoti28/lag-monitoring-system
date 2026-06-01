@@ -116,6 +116,10 @@ function _buildJobs() {
         consumer_group: t.consumer_group,
         team: t.team,
         channel: t.channel,
+        description: t.description || '',
+        prom_job: t.job || '',
+        ooa: t.ooa || '',
+        oop: t.oop || '',
         environment: env,
         job_id: `${t.topic}::${env}`,
       });
@@ -233,6 +237,9 @@ async function loadCardSparkline(job, minutes) {
   let data;
   try {
     const params = new URLSearchParams({ minutes, env: job.environment, topic: job.topic, consumer_group: job.consumer_group });
+    if (job.prom_job) params.set('prom_job', job.prom_job);
+    if (job.ooa) params.set('ooa', job.ooa);
+    if (job.oop) params.set('oop', job.oop);
     data = await api(`/api/panel/consumer_group_lag/range?${params.toString()}`);
   } catch (e) {
     return;
@@ -330,6 +337,7 @@ function renderDetailModal() {
     <span class="info-item">Consumer group:<b>${job.consumer_group}</b></span>
     <span class="info-item">Environment:<b>${job.environment.toUpperCase()}</b></span>
     <span class="info-item">Threshold:<b>${FMT_AXIS(threshold)}</b></span>
+    ${job.description ? `<span class="info-item">Description:<b>${job.description}</b></span>` : ''}
   `;
   // Current lag will be filled in once data arrives; show last known status now
   const st = STATE.job_state[job.job_id] || {};
@@ -403,6 +411,9 @@ async function loadPanel(panel, job, minutes) {
   if (panel.scope.includes('env')) params.set('env', job.environment);
   if (panel.scope.includes('topic')) params.set('topic', job.topic);
   if (panel.scope.includes('consumer_group')) params.set('consumer_group', job.consumer_group);
+  if (job.prom_job) params.set('prom_job', job.prom_job);
+  if (job.ooa) params.set('ooa', job.ooa);
+  if (job.oop) params.set('oop', job.oop);
 
   // Replace any chart inside the slot with a loading placeholder while we fetch
   const placeholder = slot.querySelector('.chart-loading, .chart-svg, .chart-empty');
@@ -958,11 +969,21 @@ async function boot() {
   renderTeamGrid();
   reloadAllSparklines();
 
+  // Read the backend poll interval so the frontend stays in sync with it.
+  // This means the UI refreshes at the same rate the backend fetches from Prometheus —
+  // no misleading fast polling, no stale data sitting longer than one backend cycle.
+  let pollMs = 15000; // fallback until /api/health responds
+  try {
+    const health = await api('/api/health');
+    pollMs = (health.ui_poll_interval_seconds || 15) * 1000;
+    document.getElementById('poll-label').textContent = `Polling ${health.poll_interval_seconds}s`;
+  } catch (_) {}
+
   // Background pollers
   refreshStatus();
   refreshAlerts();
-  setInterval(refreshStatus, 5000);
-  setInterval(refreshAlerts, 5000);
+  setInterval(refreshStatus, pollMs);
+  setInterval(refreshAlerts, pollMs);
   setInterval(() => {
     if (STATE.view === 'detail') reloadAllPanels();
     else reloadAllSparklines();

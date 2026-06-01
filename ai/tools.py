@@ -250,13 +250,14 @@ class ToolRegistry:
         # ~120 points max so the LLM context stays small even for long windows
         step_seconds = max(5, (minutes * 60) // 120)
 
-        labels = ",".join(
-            [f'{k}="{v}"' for k, v in self.source.static_labels.items()] + [
-                f'ooe="{st.environment}"',
-                f'topic="{st.topic}"',
-                f'consumerGroup="{st.consumer_group}"',
-            ]
-        )
+        labels = ",".join([
+            f'job="{st.job}"',
+            f'ooa="{st.ooa}"',
+            f'oop="{st.oop}"',
+            f'ooe="{st.environment}"',
+            f'topic="{st.topic}"',
+            f'consumerGroup="{st.consumer_group}"',
+        ])
         expr = f'max(lenses_topic_consumer_lag{{{labels}}})'
         series = self.source.query_range(expr, start_ts=start_ts, end_ts=end_ts, step_seconds=step_seconds)
 

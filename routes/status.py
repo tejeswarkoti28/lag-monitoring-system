@@ -21,6 +21,7 @@ from fastapi.responses import JSONResponse
 from core.config import (
     JOB_CATALOG,
     POLL_INTERVAL_SECONDS,
+    UI_POLL_INTERVAL_SECONDS,
     THRESHOLD_MESSAGES,
     _team_env_key,
     iso,
@@ -47,6 +48,7 @@ def build_status_router(monitor, db, notifier, panels, chatbot) -> APIRouter:
             "slack_configured": slack_configured(),
             "threshold": THRESHOLD_MESSAGES,
             "poll_interval_seconds": POLL_INTERVAL_SECONDS,
+            "ui_poll_interval_seconds": UI_POLL_INTERVAL_SECONDS,
             "jobs_monitored": len(monitor.jobs),
             "data_source": "lenses",
             "chatbot_available": chatbot is not None,
@@ -136,6 +138,9 @@ def build_status_router(monitor, db, notifier, panels, chatbot) -> APIRouter:
                     "team": entry.get("team", ""),
                     "channel": entry.get("channel", ""),
                     "environments": entry.get("environments", []),
+                    "job": entry["job"],
+                    "ooa": entry["ooa"],
+                    "oop": entry["oop"],
                 }
                 for entry in JOB_CATALOG
             ],

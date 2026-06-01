@@ -41,7 +41,6 @@ def build_data_source(
             catalog=catalog,
             base_url=config["url"],
             auth_token=config.get("auth"),
-            static_labels=config.get("static_labels", {}),
             verify_ssl=bool(config.get("verify_ssl", True)),
             timeout_seconds=float(config.get("timeout_seconds", 30.0)),
         )

@@ -47,6 +47,9 @@ def build_history_router(monitor, panels, data_sources) -> APIRouter:
         topic: Optional[str] = None,
         consumer_group: Optional[str] = None,
         step_seconds: Optional[int] = None,
+        ooa: Optional[str] = None,
+        oop: Optional[str] = None,
+        prom_job: Optional[str] = None,
     ):
         try:
             panel = panels.get(panel_id)
@@ -73,15 +76,20 @@ def build_history_router(monitor, panels, data_sources) -> APIRouter:
         start_ts = end_ts - minutes * 60
         step = float(step_seconds) if step_seconds else _panel_step_for(minutes)
 
+        labels = {}
+        if prom_job: labels["job"] = prom_job
+        if ooa:      labels["ooa"] = ooa
+        if oop:      labels["oop"] = oop
+
         try:
             expr = panel.build_query(
-                static_labels=ds.static_labels,
+                static_labels=labels,
                 env=env, topic=topic, consumer_group=consumer_group,
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
 
-        cache_key = f"panel:{panel_id}:{minutes}:{env}:{topic}:{consumer_group}"
+        cache_key = f"panel:{panel_id}:{minutes}:{env}:{topic}:{consumer_group}:{ooa}:{oop}:{prom_job}"
         cached = _cache.get(cache_key)
         if cached is not None:
             return cached

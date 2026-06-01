@@ -1,16 +1,11 @@
 {
-  "_comment": "Data source registry. Each data source has a name (used as the key), a type, and a connection config. The 'static_labels' values are pre-substituted into PromQL queries so panel definitions can stay deployment-agnostic. To add a new source, append another top-level entry and reference it by name from a panel in panels.json.",
+  "_comment": "Data source registry. Each entry defines a connection only — no static labels. All Prometheus filter labels (job, ooa, oop) are declared per job in jobs.json.",
 
   "production": {
     "type": "prometheus_via_grafana_proxy",
     "url": "https://grafana.mms.walmart.net/api/datasources/proxy/uid/production",
     "auth": null,
     "verify_ssl": false,
-    "timeout_seconds": 30,
-    "static_labels": {
-      "job": "managed-kafka-consumer-service",
-      "ooa": "kafka-v2-ca-shared-secure-prod",
-      "oop": "lenses"
-    }
+    "timeout_seconds": 30
   }
 }

@@ -41,7 +41,6 @@ class PrometheusDataSource(DataSource):
         catalog: list[dict],
         base_url: str,
         auth_token: Optional[str] = None,
-        static_labels: Optional[dict] = None,
         verify_ssl: bool = True,
         timeout_seconds: float = 30.0,
     ) -> None:
@@ -53,20 +52,8 @@ class PrometheusDataSource(DataSource):
             )
         self._base_url = base_url.rstrip("/")
         self._auth_token = auth_token
-        self._static_labels = dict(static_labels or {})
-        # verify_ssl=False is intended for internal corporate hosts whose
-        # certs are signed by an internal CA Python doesn't trust by default.
-        # Only safe when you're already inside the corporate network.
         self._client = httpx.Client(timeout=timeout_seconds, verify=verify_ssl)
-        # Optional Grafana session cookie for SSO-protected proxies.
-        # Set GRAFANA_COOKIE in .env to the value of the `grafana_session`
-        # cookie from your browser when reaching the dashboard works in-browser
-        # but fails from the app (302 redirect to SSO).
         self._cookie = os.environ.get("GRAFANA_COOKIE", "").strip() or None
-
-    @property
-    def static_labels(self) -> dict:
-        return dict(self._static_labels)
 
     # ---- DataSource interface ---------------------------------------------
     def poll_all(self, *, at: Optional[float] = None) -> list[LagReading]:
@@ -150,8 +137,9 @@ class PrometheusDataSource(DataSource):
     def _lag_query(self, job: dict, *, aggregation: str) -> Optional[float]:
         """Build the lag PromQL for one job and run it."""
         labels = ",".join([
-            f'{k}="{v}"' for k, v in self._static_labels.items()
-        ] + [
+            f'job="{job["job"]}"',
+            f'ooa="{job["ooa"]}"',
+            f'oop="{job["oop"]}"',
             f'ooe="{job["environment"]}"',
             f'topic="{job["topic"]}"',
             f'consumerGroup="{job["consumer_group"]}"',

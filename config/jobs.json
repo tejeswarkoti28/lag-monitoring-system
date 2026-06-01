@@ -1,5 +1,5 @@
 {
-  "_comment": "Job catalog. Each job declares its own environments — the app fans out only those pairs. To add a new team: set 'team' on the job, then add SLACK_WEBHOOK_<TEAM_UPPERCASE_UNDERSCORED> (and optionally SLACK_ONCALL_<TEAM_UPPERCASE_UNDERSCORED>) to .env. No code changes needed.",
+  "_comment": "Job catalog. Each job fully declares all Prometheus labels (job, ooa, oop) — no implicit defaults. To add a new job: get the Grafana dashboard link, extract var-assembly→ooa, var-platform→oop, var-environment→environments, var-topic→topic, var-consumerGroup→consumer_group. Verify in Prometheus before adding.",
   "threshold_messages": 5000,
   "jobs": [
     {
@@ -8,7 +8,10 @@
       "description": "Pricing RT to UBER",
       "team": "Team",
       "channel": "#pno-team",
-      "environments": ["wus"]
+      "job": "managed-kafka-consumer-service",
+      "ooa": "kafka-v2-item-pricing-prod",
+      "oop": "lenses",
+      "environments": ["wus2"]
     },
     {
       "topic": "pricing-events-prod",
@@ -16,6 +19,9 @@
       "description": "Pricing RT to UBER",
       "team": "Team",
       "channel": "#pno-team",
+      "job": "managed-kafka-consumer-service",
+      "ooa": "kafka-v2-item-pricing-prod",
+      "oop": "lenses",
       "environments": ["scus"]
     },
     {
@@ -24,7 +30,10 @@
       "description": "UBER to PNO",
       "team": "Team",
       "channel": "#pno-team",
-      "environments": ["wmnt-uscentral"]
+      "job": "managed-kafka-consumer-service",
+      "ooa": "kafka-v2-mt-uber-pvt-prod",
+      "oop": "lenses",
+      "environments": ["wmt-uscentral"]
     },
     {
       "topic": "uber-offerpricing-incremental-canada-events",
@@ -32,7 +41,10 @@
       "description": "UBER to PNO",
       "team": "Team",
       "channel": "#pno-team",
-      "environments": ["wmnt-uswest"]
+      "job": "managed-kafka-consumer-service",
+      "ooa": "kafka-v2-mt-uber-pvt-prod",
+      "oop": "lenses",
+      "environments": ["wmt-uswest"]
     },
     {
       "topic": "ca-price-offer-unifiedrollup-offer-events",
@@ -40,6 +52,9 @@
       "description": "PNO to PNO Rollup Topic : price eligibility to Rollup Updates",
       "team": "Team",
       "channel": "#pno-team",
+      "job": "managed-kafka-consumer-service",
+      "ooa": "kafka-v2-ca-shared-secure-prod",
+      "oop": "lenses",
       "environments": ["eus"]
     },
     {
@@ -48,6 +63,9 @@
       "description": "PNO to PNO Rollup Topic : offer_data to Rollup Updates",
       "team": "Team",
       "channel": "#pno-team",
+      "job": "managed-kafka-consumer-service",
+      "ooa": "kafka-v2-ca-shared-secure-prod",
+      "oop": "lenses",
       "environments": ["scus"]
     },
     {
@@ -56,6 +74,9 @@
       "description": "PNO to PNO Rollup Topic : Winning offer updates from PNO to UBER and Catalog",
       "team": "Team",
       "channel": "#pno-team",
+      "job": "managed-kafka-consumer-service",
+      "ooa": "kafka-v2-ca-shared-secure-prod",
+      "oop": "lenses",
       "environments": ["scus"]
     },
     {
@@ -64,6 +85,9 @@
       "description": "PNO to PNO Rollup Topic : Shipping price updates to PNO",
       "team": "Team",
       "channel": "#pno-team",
+      "job": "managed-kafka-consumer-service",
+      "ooa": "kafka-v2-ca-shared-secure-prod",
+      "oop": "lenses",
       "environments": ["scus"]
     },
     {
@@ -72,6 +96,9 @@
       "description": "PNO to PNO Rollup Topic : Buy Box updates to PNO",
       "team": "Team",
       "channel": "#pno-team",
+      "job": "managed-kafka-consumer-service",
+      "ooa": "kafka-v2-ca-shared-secure-prod",
+      "oop": "lenses",
       "environments": ["scus"]
     },
     {
@@ -80,6 +107,9 @@
       "description": "PNO to PNO Rollup Topic : Buy Box updates to PNO",
       "team": "Team",
       "channel": "#pno-team",
+      "job": "managed-kafka-consumer-service",
+      "ooa": "kafka-v2-ca-shared-secure-prod",
+      "oop": "lenses",
       "environments": ["scus"]
     },
     {
@@ -88,6 +118,9 @@
       "description": "Offer updates from PNO to Catalog",
       "team": "Team",
       "channel": "#pno-team",
+      "job": "managed-kafka-consumer-service",
+      "ooa": "kafka-v2-ca-secure-prod",
+      "oop": "lenses",
       "environments": ["scus"]
     },
     {
@@ -96,6 +129,9 @@
       "description": "Catalog internal topics",
       "team": "Team",
       "channel": "#pno-team",
+      "job": "managed-kafka-consumer-service",
+      "ooa": "kafka-v2-ca-shared-secure-prod",
+      "oop": "lenses",
       "environments": ["scus"]
     },
     {
@@ -104,6 +140,9 @@
       "description": "Catalog internal topics",
       "team": "Team",
       "channel": "#pno-team",
+      "job": "managed-kafka-consumer-service",
+      "ooa": "kafka-v2-ca-shared-secure-prod",
+      "oop": "lenses",
       "environments": ["scus"]
     },
     {
@@ -112,6 +151,9 @@
       "description": "Catalog internal topics",
       "team": "Team",
       "channel": "#pno-team",
+      "job": "managed-kafka-consumer-service",
+      "ooa": "kafka-v2-ca-shared-secure-prod",
+      "oop": "lenses",
       "environments": ["scus"]
     },
     {
@@ -120,6 +162,9 @@
       "description": "Catalog internal topics",
       "team": "Team",
       "channel": "#pno-team",
+      "job": "managed-kafka-consumer-service",
+      "ooa": "kafka-v2-ca-shared-secure-prod",
+      "oop": "lenses",
       "environments": ["scus"]
     }
   ]

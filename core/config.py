@@ -35,7 +35,9 @@ THRESHOLD_MESSAGES: int = int(
 )
 JOB_CATALOG: list[dict] = list(_cfg.get("jobs", []))
 
-POLL_INTERVAL_SECONDS: float = float(os.environ.get("POLL_INTERVAL_SECONDS", "5"))
+POLL_INTERVAL_SECONDS: float = float(os.environ.get("POLL_INTERVAL_SECONDS", "60"))
+_UI_POLLS_PER_CYCLE: int = max(1, int(os.environ.get("UI_POLLS_PER_CYCLE", "3")))
+UI_POLL_INTERVAL_SECONDS: float = POLL_INTERVAL_SECONDS / _UI_POLLS_PER_CYCLE
 PUBLIC_URL: str = os.environ.get(
     "LAG_MONITOR_PUBLIC_URL", "http://localhost:8000"
 ).rstrip("/")
