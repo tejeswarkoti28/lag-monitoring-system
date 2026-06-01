@@ -5,20 +5,16 @@ Monitor.run() ticks every POLL_INTERVAL_SECONDS:
   1. Asks the DataSource for the latest lag readings
   2. Passes each reading through AlertEngine
   3. If an event fires, sends it to Slack and persists it in AlertDB
-  4. Writes a batch of readings to HistoryDB
-  5. Updates the in-memory ring used by /api/status for live sparklines
 """
 from __future__ import annotations
 
 import asyncio
-import time
-from dataclasses import dataclass, field
-from datetime import datetime
+from dataclasses import dataclass
 from typing import Optional
 
 from core.alerting import AlertEngine, AlertEvent, SlackNotifier
-from core.config import HISTORY_RETENTION_MINUTES, POLL_INTERVAL_SECONDS, iso, now_utc
-from core.db import AlertDB, HistoryDB
+from core.config import POLL_INTERVAL_SECONDS, now_utc
+from core.db import AlertDB
 from data_sources import DataSource, LagReading
 
 
@@ -31,7 +27,6 @@ class JobState:
     team: str
     channel: str
     description: str = ""
-    history: list[dict] = field(default_factory=list)  # [{ts, cg_lag, topic_lag, lag}]
     current: Optional[LagReading] = None
 
 
@@ -42,13 +37,11 @@ class Monitor:
         engine: AlertEngine,
         notifier: SlackNotifier,
         db: AlertDB,
-        history_db: HistoryDB,
     ) -> None:
         self.source = source
         self.engine = engine
         self.notifier = notifier
         self.db = db
-        self.history_db = history_db
         self.jobs: dict[str, JobState] = {}
         self.last_poll_ts: Optional[object] = None
         self._task: Optional[asyncio.Task] = None
@@ -78,38 +71,14 @@ class Monitor:
 
     async def _poll_once(self) -> None:
         readings = self.source.poll_all()
-        batch: list[tuple[str, int, int, int]] = []
         for r in readings:
-            self._record_history(r)
-            batch.append((
-                r.job_id,
-                int(r.timestamp.timestamp()),
-                r.consumer_group_lag,
-                r.topic_lag,
-            ))
+            st = self.jobs.get(r.job_id)
+            if st:
+                st.current = r
             event = self.engine.evaluate(r)
             if event is not None:
                 await self._handle_event(event)
-        self.history_db.insert_batch(batch)
         self.last_poll_ts = now_utc()
-
-    def _record_history(self, r: LagReading) -> None:
-        """Update the in-memory ring (used for live sparklines on the job grid)."""
-        st = self.jobs.get(r.job_id)
-        if st is None:
-            return
-        st.current = r
-        st.history.append({
-            "ts": iso(r.timestamp),
-            "cg_lag": r.consumer_group_lag,
-            "topic_lag": r.topic_lag,
-            "lag": r.lag,
-        })
-        cutoff = time.time() - HISTORY_RETENTION_MINUTES * 60
-        st.history = [
-            h for h in st.history
-            if datetime.fromisoformat(h["ts"]).timestamp() >= cutoff
-        ]
 
     async def _handle_event(self, event: AlertEvent) -> None:
         delivered = await self.notifier.send(event)

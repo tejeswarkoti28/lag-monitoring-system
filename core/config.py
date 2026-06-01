@@ -39,14 +39,7 @@ POLL_INTERVAL_SECONDS: float = float(os.environ.get("POLL_INTERVAL_SECONDS", "5"
 PUBLIC_URL: str = os.environ.get(
     "LAG_MONITOR_PUBLIC_URL", "http://localhost:8000"
 ).rstrip("/")
-HISTORY_RETENTION_MINUTES: int = 60
 DB_PATH: str = os.environ.get("LAG_MONITOR_DB", "lag_monitor.db")
-
-RAW_RETENTION_DAYS: int       = int(os.environ.get("LAG_HISTORY_RAW_DAYS", "7"))
-ROLLUP_1M_RETENTION_DAYS: int = int(os.environ.get("LAG_HISTORY_1M_DAYS",  "90"))
-ROLLUP_1H_RETENTION_DAYS: int = int(os.environ.get("LAG_HISTORY_1H_DAYS",  "1095"))
-# Longest possible window a client can request.
-HISTORY_RETENTION_DAYS: int   = ROLLUP_1H_RETENTION_DAYS
 
 
 # ---------------------------------------------------------------------------

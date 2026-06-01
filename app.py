@@ -9,11 +9,11 @@ This file intentionally contains NO business logic. It just:
 
 To understand the system, start here and follow the imports:
   core/config.py   — all config constants, time helpers, Slack helpers
-  core/db.py       — AlertDB (events), HistoryDB (time-series), ResponseCache
+  core/db.py       — AlertDB (events), ResponseCache
   core/alerting.py — AlertEngine (breach detection), SlackNotifier
   core/monitor.py  — Monitor (background polling loop)
   routes/status.py — /api/health, /api/status, /api/alerts, /api/topics, /api/panels, /api/slack/test
-  routes/history.py— /api/job/{id}/history, /api/panel/{id}/range
+  routes/history.py— /api/panel/{id}/range
   routes/chat.py   — /api/chat (AI assistant)
   static/index.html— dashboard HTML
   static/style.css — dashboard CSS
@@ -41,7 +41,7 @@ except ImportError:
     pass
 
 from core.config import DB_PATH, JOB_CATALOG
-from core.db import AlertDB, HistoryDB
+from core.db import AlertDB
 from core.alerting import AlertEngine, SlackNotifier
 from core.monitor import Monitor
 from data_sources import build_all_data_sources, get_primary_data_source
@@ -58,9 +58,8 @@ _source        = get_primary_data_source(catalog=JOB_CATALOG)
 _panels        = default_panel_registry()
 _engine        = AlertEngine()
 _db            = AlertDB(DB_PATH)
-_history_db    = HistoryDB(DB_PATH)
 _notifier      = SlackNotifier()
-_monitor       = Monitor(_source, _engine, _notifier, _db, _history_db)
+_monitor       = Monitor(_source, _engine, _notifier, _db)
 
 
 def _build_chatbot():
@@ -76,7 +75,7 @@ def _build_chatbot():
         return None
     from core.config import THRESHOLD_MESSAGES
     tools = ToolRegistry(
-        monitor=_monitor, db=_db, history_db=_history_db,
+        monitor=_monitor, db=_db,
         source=_source, threshold=THRESHOLD_MESSAGES,
     )
     return Chatbot(llm=llm, tools=tools)
@@ -90,16 +89,6 @@ _chatbot = _build_chatbot()
 # =============================================================================
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    try:
-        deleted = _history_db.cleanup()
-        total = sum(deleted.values())
-        if total:
-            print(f"[history] purged {total} rows "
-                  f"(raw={deleted['lag_history']}, "
-                  f"1m={deleted['lag_history_1m']}, "
-                  f"1h={deleted['lag_history_1h']})")
-    except Exception as exc:
-        print(f"[history] cleanup failed: {exc}", file=sys.stderr)
     _monitor.start()
     try:
         yield
@@ -134,7 +123,7 @@ def root():
 # Mount all routers
 # =============================================================================
 app.include_router(build_status_router(_monitor, _db, _notifier, _panels, _chatbot))
-app.include_router(build_history_router(_monitor, _history_db, _panels, _data_sources))
+app.include_router(build_history_router(_monitor, _panels, _data_sources))
 app.include_router(build_chat_router(_chatbot))
 
 

@@ -3,7 +3,7 @@
 // =============================================================================
 // Sparklines on the team-grid cards always show this many minutes. Each modal
 // chart picks its own range from the per-chart range bar.
-const SPARKLINE_MINUTES = 30;
+const SPARKLINE_MINUTES = 1440; // 24h — fetched from Prometheus, not SQLite
 
 const STATE = {
   topics: [],          // [{topic, consumer_group, team, channel}]
@@ -109,7 +109,8 @@ function relTime(iso) {
 function _buildJobs() {
   const out = [];
   for (const t of STATE.topics) {
-    for (const env of STATE.environments) {
+    const envs = (t.environments && t.environments.length) ? t.environments : STATE.environments;
+    for (const env of envs) {
       out.push({
         topic: t.topic,
         consumer_group: t.consumer_group,
@@ -231,11 +232,12 @@ async function loadCardSparkline(job, minutes) {
   if (!slot) return;
   let data;
   try {
-    data = await api(`/api/job/${encodeURIComponent(job.job_id)}/history?minutes=${minutes}`);
+    const params = new URLSearchParams({ minutes, env: job.environment, topic: job.topic, consumer_group: job.consumer_group });
+    data = await api(`/api/panel/consumer_group_lag/range?${params.toString()}`);
   } catch (e) {
     return;
   }
-  const points = (data.history || []).map(h => h.lag || 0);
+  const points = (data.points || []).map(p => p.value || 0);
   STATE.job_state[job.job_id] = STATE.job_state[job.job_id] || {};
   if (points.length) {
     STATE.job_state[job.job_id].sparkline = points;

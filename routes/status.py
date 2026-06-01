@@ -74,7 +74,6 @@ def build_status_router(monitor, db, notifier, panels, chatbot) -> APIRouter:
                 "topic_lag": cur.topic_lag if cur else 0,
                 "status": "breach" if is_breach else "ok",
                 "timestamp": iso(cur.timestamp) if cur else None,
-                "sparkline": [h["lag"] for h in st.history[-180:]],
             })
         items.sort(key=lambda j: (0 if j["status"] == "breach" else 1, j["topic"], j["environment"]))
         return {
@@ -136,6 +135,7 @@ def build_status_router(monitor, db, notifier, panels, chatbot) -> APIRouter:
                     "description": entry.get("description", ""),
                     "team": entry.get("team", ""),
                     "channel": entry.get("channel", ""),
+                    "environments": entry.get("environments", []),
                 }
                 for entry in JOB_CATALOG
             ],

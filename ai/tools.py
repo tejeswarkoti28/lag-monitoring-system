@@ -135,13 +135,11 @@ class ToolRegistry:
         *,
         monitor: Any,
         db: Any,
-        history_db: Any,
         source: Any,
         threshold: int,
     ) -> None:
         self.monitor = monitor
         self.db = db
-        self.history_db = history_db
         self.source = source
         self.threshold = threshold
 
@@ -238,24 +236,30 @@ class ToolRegistry:
         return {"window_hours": hours, "teams": out}
 
     def get_job_history(self, job_id: str, minutes: int = 60) -> dict:
-        minutes = max(1, min(int(minutes), 60 * 24 * 90))   # cap at 90 days
+        minutes = max(1, min(int(minutes), 60 * 24 * 90))
         st = self.monitor.jobs.get(job_id)
         if st is None:
             return {"error": f"unknown job_id: {job_id}"}
+
+        from data_sources.prometheus import PrometheusDataSource
+        if not isinstance(self.source, PrometheusDataSource):
+            return {"error": "data source does not support range queries"}
+
         end_ts = time.time()
         start_ts = end_ts - minutes * 60
-        # Use the same bucketing the dashboard uses, so the LLM sees the
-        # same shape the human would see. For very long ranges keep the
-        # payload small so it fits in the model's context window.
-        from app import bucket_seconds_for     # local import to avoid cycle at module load
-        bucket = bucket_seconds_for(minutes)
-        series = self.history_db.query(
-            job_id=job_id, start_ts=start_ts, end_ts=end_ts, bucket_seconds=bucket,
+        # ~120 points max so the LLM context stays small even for long windows
+        step_seconds = max(5, (minutes * 60) // 120)
+
+        labels = ",".join(
+            [f'{k}="{v}"' for k, v in self.source.static_labels.items()] + [
+                f'ooe="{st.environment}"',
+                f'topic="{st.topic}"',
+                f'consumerGroup="{st.consumer_group}"',
+            ]
         )
-        # Cap at 120 points so the LLM context stays small even for 6-month windows
-        if len(series) > 120:
-            stride = max(1, len(series) // 120)
-            series = series[::stride]
+        expr = f'max(lenses_topic_consumer_lag{{{labels}}})'
+        series = self.source.query_range(expr, start_ts=start_ts, end_ts=end_ts, step_seconds=step_seconds)
+
         return {
             "job_id": job_id,
             "topic": st.topic,
@@ -263,10 +267,10 @@ class ToolRegistry:
             "environment": st.environment,
             "team": st.team,
             "minutes": minutes,
-            "bucket_seconds": bucket,
+            "step_seconds": step_seconds,
             "threshold": self.threshold,
             "points": len(series),
-            "history": series,
+            "history": [{"ts": ts, "lag": int(v)} for ts, v in series],
         }
 
     def list_jobs(self) -> dict:

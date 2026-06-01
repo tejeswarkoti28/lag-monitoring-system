@@ -2,7 +2,6 @@
 routes/history.py — Time-series chart endpoints.
 
 Endpoints:
-  GET /api/job/{job_id}/history      — downsampled lag history for a single job
   GET /api/panel/{panel_id}/range    — PromQL range query for a declarative panel
 """
 from __future__ import annotations
@@ -12,10 +11,9 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 
-from core.config import HISTORY_RETENTION_DAYS, THRESHOLD_MESSAGES
-from core.db import ResponseCache, bucket_seconds_for
+from core.config import THRESHOLD_MESSAGES
+from core.db import ResponseCache
 from data_sources.prometheus import PrometheusDataSource
-from panels import Panel
 
 _cache = ResponseCache(ttl=30.0)
 
@@ -33,48 +31,13 @@ def _panel_step_for(minutes: int) -> float:
     return 28800
 
 
-def build_history_router(monitor, history_db, panels, data_sources) -> APIRouter:
+def build_history_router(monitor, panels, data_sources) -> APIRouter:
     """
     monitor      — Monitor instance (for job metadata lookup)
-    history_db   — HistoryDB instance
     panels       — PanelRegistry instance
     data_sources — dict[str, DataSource] (all configured sources)
     """
     router = APIRouter()
-
-    @router.get("/api/job/{job_id}/history")
-    def job_history(job_id: str, minutes: int = 30):
-        st = monitor.jobs.get(job_id)
-        if st is None:
-            raise HTTPException(status_code=404, detail=f"unknown job_id: {job_id}")
-        max_minutes = HISTORY_RETENTION_DAYS * 24 * 60
-        minutes = max(1, min(minutes, max_minutes))
-
-        cache_key = f"hist:{job_id}:{minutes}"
-        cached = _cache.get(cache_key)
-        if cached is not None:
-            return cached
-
-        end_ts = time.time()
-        start_ts = end_ts - minutes * 60
-        bucket = bucket_seconds_for(minutes)
-        series = history_db.query(
-            job_id=job_id, start_ts=start_ts, end_ts=end_ts, bucket_seconds=bucket,
-        )
-        result = {
-            "job_id": job_id,
-            "topic": st.topic,
-            "consumer_group": st.consumer_group,
-            "environment": st.environment,
-            "team": st.team,
-            "channel": st.channel,
-            "threshold": THRESHOLD_MESSAGES,
-            "minutes": minutes,
-            "step_seconds": bucket,
-            "history": series,
-        }
-        _cache.set(cache_key, result)
-        return result
 
     @router.get("/api/panel/{panel_id}/range")
     def panel_range(
