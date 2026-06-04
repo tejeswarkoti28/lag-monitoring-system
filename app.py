@@ -75,7 +75,7 @@ def _build_chatbot():
         return None
     from core.config import THRESHOLD_MESSAGES
     tools = ToolRegistry(
-        monitor=_monitor, db=_db,
+        monitor=_monitor,
         source=_source, threshold=THRESHOLD_MESSAGES,
     )
     return Chatbot(llm=llm, tools=tools)

@@ -80,16 +80,23 @@ class AlertDB:
             )
             return cur.lastrowid
 
-    def recent_alerts(self, limit: int = 50, hours: int = 24) -> list[dict]:
+    def recent_alerts(self, limit: int = 50, hours: int = 24, alert_type: Optional[str] = None) -> list[dict]:
         cutoff = iso(
             datetime.fromtimestamp(time.time() - hours * 3600, tz=timezone.utc)
         )
         with self._conn() as conn:
-            rows = conn.execute(
-                "SELECT * FROM alerts WHERE created_at >= ? "
-                "ORDER BY id DESC LIMIT ?",
-                (cutoff, limit),
-            ).fetchall()
+            if alert_type:
+                rows = conn.execute(
+                    "SELECT * FROM alerts WHERE created_at >= ? AND alert_type = ? "
+                    "ORDER BY id DESC LIMIT ?",
+                    (cutoff, alert_type, limit),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM alerts WHERE created_at >= ? "
+                    "ORDER BY id DESC LIMIT ?",
+                    (cutoff, limit),
+                ).fetchall()
             return [dict(r) for r in rows]
 
     def count_in_last_hours(self, hours: int, alert_type: str = "breach") -> int:

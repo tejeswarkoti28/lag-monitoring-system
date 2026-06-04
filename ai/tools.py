@@ -4,9 +4,6 @@ Tools the chatbot can call.
 Each tool is:
   1. A JSON-schema definition (TOOL_DEFS) that the LLM sees.
   2. A method on ToolRegistry that actually fetches the data.
-
-The registry holds references to the live monitor, AlertDB, and DataSource so
-tools query the same data the rest of the app sees — no duplication.
 """
 from __future__ import annotations
 
@@ -15,8 +12,6 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 
-# OpenAI tool-spec format. Other providers (Anthropic, Gemini) accept slightly
-# different schemas; the LLMClient implementation adapts as needed.
 TOOL_DEFS: list[dict] = [
     {
         "type": "function",
@@ -39,24 +34,19 @@ TOOL_DEFS: list[dict] = [
         "function": {
             "name": "get_recent_alerts",
             "description": (
-                "Return recent breach + resolved alerts from the alert log. "
-                "Filter by team and time window. Use this for trend questions, "
-                "postmortems, or 'how many breaches did X have'."
+                "Return all breach periods within a time window, optionally filtered by team. "
+                "Use this for postmortems, trend questions, or 'how many breaches did X have'."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
                     "team": {
                         "type": "string",
-                        "description": "Optional team filter, e.g. 'Catalog Team', 'PNO Team', 'Shipping Team'.",
+                        "description": "Optional team filter, e.g. 'Team'.",
                     },
                     "hours": {
                         "type": "integer",
                         "description": "Lookback window in hours. Default 24, max 720 (30d).",
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "description": "Max rows to return. Default 50, max 500.",
                     },
                 },
                 "required": [],
@@ -68,8 +58,8 @@ TOOL_DEFS: list[dict] = [
         "function": {
             "name": "get_team_breakdown",
             "description": (
-                "Aggregated breach counts per team over a time window. Use this for "
-                "accountability or comparison questions ('which team breached most this week')."
+                "Aggregated breach counts per team over a time window. "
+                "Use for accountability or comparison questions like 'which team breached most this week'."
             ),
             "parameters": {
                 "type": "object",
@@ -128,18 +118,16 @@ TOOL_DEFS: list[dict] = [
 
 
 class ToolRegistry:
-    """Executes tool calls against the running app's data layer."""
+    """Executes tool calls against the data source and in-memory monitor state."""
 
     def __init__(
         self,
         *,
         monitor: Any,
-        db: Any,
         source: Any,
         threshold: int,
     ) -> None:
         self.monitor = monitor
-        self.db = db
         self.source = source
         self.threshold = threshold
 
@@ -154,6 +142,89 @@ class ToolRegistry:
             return {"error": f"bad arguments for {name}: {exc}"}
         except Exception as exc:
             return {"error": f"tool {name} failed: {exc}"}
+
+    # ---- shared breach scanner ---------------------------------------------
+    def _scan_breaches(self, hours: int) -> list[dict]:
+        """Scan range data for every job and return breach periods.
+
+        Detects each contiguous window where lag >= threshold, recording
+        start time, end time, duration, and peak lag.
+        """
+        from data_sources.prometheus import PrometheusDataSource
+        if not isinstance(self.source, PrometheusDataSource):
+            return []
+
+        end_ts = time.time()
+        start_ts = end_ts - hours * 3600
+        # ~300 points per job balances resolution vs LLM context size
+        step_seconds = max(60, (hours * 3600) // 300)
+
+        breach_periods: list[dict] = []
+
+        for st in self.monitor.jobs.values():
+            labels = ",".join([
+                f'job="{st.job}"',
+                f'ooa="{st.ooa}"',
+                f'oop="{st.oop}"',
+                f'ooe="{st.environment}"',
+                f'topic="{st.topic}"',
+                f'consumerGroup="{st.consumer_group}"',
+            ])
+            expr = f'max(lenses_topic_consumer_lag{{{labels}}})'
+            series = self.source.query_range(
+                expr, start_ts=start_ts, end_ts=end_ts, step_seconds=step_seconds
+            )
+
+            if not series:
+                continue
+
+            in_breach = False
+            breach_start_ts = None
+            peak_lag = 0
+
+            for ts, val in series:
+                lag = int(val)
+                if lag >= self.threshold:
+                    if not in_breach:
+                        in_breach = True
+                        breach_start_ts = ts
+                        peak_lag = lag
+                    else:
+                        peak_lag = max(peak_lag, lag)
+                else:
+                    if in_breach:
+                        breach_periods.append({
+                            "job_id": st.job_id,
+                            "topic": st.topic,
+                            "consumer_group": st.consumer_group,
+                            "environment": st.environment,
+                            "team": st.team,
+                            "breach_start": datetime.fromtimestamp(breach_start_ts, tz=timezone.utc).isoformat(),
+                            "breach_end": datetime.fromtimestamp(ts, tz=timezone.utc).isoformat(),
+                            "duration_minutes": round((ts - breach_start_ts) / 60, 1),
+                            "peak_lag": peak_lag,
+                            "threshold": self.threshold,
+                            "status": "resolved",
+                        })
+                        in_breach = False
+
+            # Still breaching at the end of the scan window
+            if in_breach:
+                breach_periods.append({
+                    "job_id": st.job_id,
+                    "topic": st.topic,
+                    "consumer_group": st.consumer_group,
+                    "environment": st.environment,
+                    "team": st.team,
+                    "breach_start": datetime.fromtimestamp(breach_start_ts, tz=timezone.utc).isoformat(),
+                    "breach_end": "ongoing",
+                    "duration_minutes": round((time.time() - breach_start_ts) / 60, 1),
+                    "peak_lag": peak_lag,
+                    "threshold": self.threshold,
+                    "status": "active",
+                })
+
+        return sorted(breach_periods, key=lambda x: x["breach_start"], reverse=True)
 
     # ---- tool implementations ---------------------------------------------
     def get_current_status(self) -> dict:
@@ -191,49 +262,57 @@ class ToolRegistry:
         self,
         team: Optional[str] = None,
         hours: int = 24,
-        limit: int = 50,
     ) -> dict:
         hours = max(1, min(int(hours), 720))
-        limit = max(1, min(int(limit), 500))
-        # AlertDB.recent_alerts already has a window arg
-        rows = self.db.recent_alerts(limit=limit, hours=hours)
+        breaches = self._scan_breaches(hours)
         if team:
             team_lower = team.lower().strip()
-            rows = [r for r in rows if (r.get("team", "").lower().strip() == team_lower)]
+            breaches = [b for b in breaches if b.get("team", "").lower().strip() == team_lower]
         return {
             "window_hours": hours,
             "team_filter": team,
-            "count": len(rows),
-            "alerts": rows,
+            "count": len(breaches),
+            "alerts": breaches,
         }
 
     def get_team_breakdown(self, hours: int = 168) -> dict:
         hours = max(1, min(int(hours), 720))
-        rows = self.db.recent_alerts(limit=10_000, hours=hours)
+        breaches = self._scan_breaches(hours)
+
         per_team: dict[str, dict] = {}
-        for r in rows:
-            t = r.get("team", "Unknown")
-            bucket = per_team.setdefault(t, {
-                "team": t,
+        for b in breaches:
+            team = b.get("team", "Unknown")
+            bucket = per_team.setdefault(team, {
+                "team": team,
                 "breach_count": 0,
-                "resolved_count": 0,
+                "active_count": 0,
+                "total_duration_minutes": 0.0,
+                "peak_lag": 0,
                 "topics_affected": set(),
             })
-            if r.get("alert_type") == "breach":
-                bucket["breach_count"] += 1
-            elif r.get("alert_type") == "resolved":
-                bucket["resolved_count"] += 1
-            bucket["topics_affected"].add(r.get("topic", ""))
-        out = []
-        for t, b in per_team.items():
-            out.append({
+            bucket["breach_count"] += 1
+            if b["status"] == "active":
+                bucket["active_count"] += 1
+            bucket["total_duration_minutes"] += b.get("duration_minutes", 0)
+            bucket["peak_lag"] = max(bucket["peak_lag"], b.get("peak_lag", 0))
+            bucket["topics_affected"].add(b.get("topic", ""))
+
+        out = [
+            {
                 "team": t,
                 "breach_count": b["breach_count"],
-                "resolved_count": b["resolved_count"],
+                "active_breaches": b["active_count"],
+                "total_duration_minutes": round(b["total_duration_minutes"], 1),
+                "peak_lag": b["peak_lag"],
                 "topics_affected": sorted(x for x in b["topics_affected"] if x),
-            })
+            }
+            for t, b in per_team.items()
+        ]
         out.sort(key=lambda x: -x["breach_count"])
-        return {"window_hours": hours, "teams": out}
+        return {
+            "window_hours": hours,
+            "teams": out,
+        }
 
     def get_job_history(self, job_id: str, minutes: int = 60) -> dict:
         minutes = max(1, min(int(minutes), 60 * 24 * 90))
@@ -247,7 +326,6 @@ class ToolRegistry:
 
         end_ts = time.time()
         start_ts = end_ts - minutes * 60
-        # ~120 points max so the LLM context stays small even for long windows
         step_seconds = max(5, (minutes * 60) // 120)
 
         labels = ",".join([

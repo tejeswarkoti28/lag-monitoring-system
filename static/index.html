@@ -55,7 +55,7 @@
     <div class="stat-sub">below threshold</div>
   </div>
   <div class="stat alerts">
-    <div class="stat-label">Alerts (24h)</div>
+    <div class="stat-label">Actual breaches (24h)</div>
     <div class="stat-value" id="stat-alerts">--</div>
     <div class="stat-sub">breach events logged</div>
   </div>
@@ -74,7 +74,7 @@
 
   <div class="panel-right">
     <div class="panel-right-head">
-      <div class="panel-right-title">Live alert feed</div>
+      <div class="panel-right-title">Slack breach alerts sent</div>
       <div class="panel-right-meta" id="feed-count">0 alerts</div>
     </div>
     <div class="feed" id="feed"><div class="empty-state">No alerts yet — system is monitoring.</div></div>
@@ -141,6 +141,11 @@
   </div>
 </aside>
 
+<script src="/static/utils.js"></script>
+<script src="/static/chart.js"></script>
+<script src="/static/jobs.js"></script>
+<script src="/static/status.js"></script>
+<script src="/static/ai.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>
