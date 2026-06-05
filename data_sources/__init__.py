@@ -26,8 +26,7 @@ def load_configs(config_path: Optional[Path] = None) -> dict:
         )
     with open(config_path, "r", encoding="utf-8") as f:
         raw = json.load(f)
-    return {k: v for k, v in raw.items() if not k.startswith("_")}
-
+    return {k: v for k, v in raw.items() if not k.startswith("_")}      #excludes keys starting with _
 
 def build_data_source(
     name: str,
@@ -37,7 +36,7 @@ def build_data_source(
 ) -> DataSource:
     kind = config.get("type")
     if kind == "prometheus_via_grafana_proxy" or kind == "prometheus":
-        return PrometheusDataSource(
+        return PrometheusDataSource(        #the intention is to return a datasource object, but since we haveadded if condition for prometheus, we are returning prometheus datasource object which is a subclass of datasouce object.
             catalog=catalog,
             base_url=config["url"],
             auth_token=config.get("auth"),
